@@ -1,0 +1,87 @@
+{
+  "hero": {
+    "title": "Our Latest Posts",
+    "subtitle": "Practical insights for used-car buyers and vehicle businesses."
+  },
+  "categories": ["All", "Business Growth", "Car Buying", "News & Updates", "Guides"],
+  "about": {
+    "title": "About Us",
+    "description": "SeaNeB shares practical insights for buyers and vehicle sellers. Learn how to compare, discover, and grow with structured local search."
+  },
+  "social": ["f", "x", "in", "yt", "ig"],
+  "tags": [
+    "Business",
+    "Customer Journey",
+    "Car Buying",
+    "Pricing",
+    "Comparison",
+    "Local Discovery",
+    "Leads",
+    "Marketplace"
+  ],
+  "posts": [
+    {
+      "id": 1,
+      "title": "How To Attract More Customers In Local Markets",
+      "category": "Business Growth",
+      "date": "Nov 26, 2025",
+      "image": "/HomeCar.jpg"
+    },
+    {
+      "id": 2,
+      "title": "Top Mistakes New Service Providers Should Avoid",
+      "category": "Guides",
+      "date": "Nov 20, 2025",
+      "image": "/HomeCar.jpg"
+    },
+    {
+      "id": 3,
+      "title": "Pricing Strategies That Improve Conversion Rates",
+      "category": "Business Growth",
+      "date": "Nov 11, 2025",
+      "image": "/HomeCar.jpg"
+    },
+    {
+      "id": 4,
+      "title": "Building Trust Through Better Profiles and Reviews",
+      "category": "News & Updates",
+      "date": "Nov 03, 2025",
+      "image": "/HomeCar.jpg"
+    },
+    {
+      "id": 5,
+      "title": "Search Smarter: City And Area Filtering Explained",
+      "category": "Guides",
+      "date": "Oct 29, 2025",
+      "image": "/HomeCar.jpg"
+    },
+    {
+      "id": 6,
+      "title": "What Buyers Look For In A Verified Listing",
+      "category": "Car Buying",
+      "date": "Oct 21, 2025",
+      "image": "/HomeCar.jpg"
+    },
+    {
+      "id": 7,
+      "title": "How Direct Contact Improves Buyer Confidence",
+      "category": "News & Updates",
+      "date": "Oct 17, 2025",
+      "image": "/HomeCar.jpg"
+    },
+    {
+      "id": 8,
+      "title": "A Practical Checklist Before Buying A Used Car",
+      "category": "Car Buying",
+      "date": "Oct 08, 2025",
+      "image": "/HomeCar.jpg"
+    },
+    {
+      "id": 9,
+      "title": "From Listing To Lead: A Simple Seller Workflow",
+      "category": "Business Growth",
+      "date": "Sep 28, 2025",
+      "image": "/HomeCar.jpg"
+    }
+  ]
+}

@@ -1,0 +1,120 @@
+{
+  "hero": {
+    "title": "SeaNeB Autos Solution",
+    "subtitle": "A professional discovery platform for buyers and vehicle sellers."
+  },
+  "overview": {
+    "image": {
+      "src": "/images/mobilescreensolutionpage.svg",
+      "alt": "SeaNeB mobile experience",
+      "width": 320,
+      "height": 430
+    },
+    "title": "Built for practical vehicle discovery",
+    "description": "SeaNeB helps users find relevant second-hand cars near them while giving sellers a structured channel to present listings and receive direct inquiries.",
+    "points": [
+      "Location-aware search with real market context.",
+      "Cleaner comparison journey for buyers.",
+      "Higher visibility and qualified leads for sellers."
+    ]
+  },
+  "benefits": {
+    "title": "Why choose SeaNeB Solution?",
+    "description": "Designed for people who want a reliable, transparent, and faster way to discover and transact in pre-owned vehicles.",
+    "items": [
+      "Commission-aware approach for local vehicle businesses.",
+      "Verified data and cleaner listing presentation.",
+      "Discovery optimized around where users actually search.",
+      "Direct buyer-seller communication for faster outcomes."
+    ],
+    "image": {
+      "src": "/HomeCar.jpg",
+      "alt": "Vehicle delivery and local service",
+      "width": 420,
+      "height": 300
+    }
+  },
+  "audience": {
+    "title": "Who Is It For?",
+    "subtitle": "Built for both customers and vehicle providers.",
+    "cards": [
+      {
+        "title": "For Customers",
+        "items": [
+          "Search by city, area, or pincode to find nearby verified dealers.",
+          "Compare vehicles by model, pricing, and seller quality signals.",
+          "Choose your plan and connect with the seller directly.",
+          "Shortlist and take action without unnecessary middle steps."
+        ]
+      },
+      {
+        "title": "For Vehicle Providers",
+        "items": [
+          "Zero commission platform model with direct customer reach.",
+          "Strong digital presence with structured business profiles.",
+          "Steady local discovery from intent-based searches.",
+          "Simple listing and lead management for faster operations."
+        ]
+      }
+    ]
+  },
+  "features": {
+    "title": "Key Features At A Glance",
+    "columns": ["Feature", "Description"],
+    "rows": [
+      {
+        "feature": "Commission-friendly Model",
+        "value": "Keep more revenue with transparent platform pricing."
+      },
+      {
+        "feature": "Location-first Search",
+        "value": "Users find cars by city, area, and market relevance."
+      },
+      {
+        "feature": "Direct Buyer-Seller Connection",
+        "value": "No unnecessary middle layer between both sides."
+      },
+      {
+        "feature": "Flexible Plans",
+        "value": "Daily, weekly, and monthly listing options available."
+      },
+      {
+        "feature": "Trust and Verification",
+        "value": "Profiles and listings are structured for confidence."
+      }
+    ],
+    "phoneImage": {
+      "src": "/images/mobilescreensolutionpage.svg",
+      "alt": "SeaNeB app preview",
+      "width": 320,
+      "height": 420
+    }
+  },
+  "faq": {
+    "title": "Frequently Asked Questions",
+    "subtitle": "Quick answers to common questions about SeaNeB Solution.",
+    "items": [
+      {
+        "q": "What is SeaNeB Solution?",
+        "a": "SeaNeB Solution is a focused framework to help car buyers discover trusted listings and help sellers get high-intent leads in local markets."
+      },
+      {
+        "q": "Who can use this platform?",
+        "a": "Buyers, independent dealers, and local vehicle businesses can all use the platform for discovery, comparison, and direct communication."
+      },
+      {
+        "q": "How is this different from aggregator marketplaces?",
+        "a": "The workflow is designed to reduce friction. Users can move from search to contact quickly while businesses keep stronger control over their visibility."
+      },
+      {
+        "q": "Can I join as a new seller?",
+        "a": "Yes. Register your business profile, complete verification, and start receiving local discovery traffic."
+      }
+    ]
+  },
+  "cta": {
+    "title": "Grow your vehicle business with SeaNeB",
+    "subtitle": "Join and reach ready-to-convert customers in your local market.",
+    "buttonText": "Partner With Us"
+  }
+}

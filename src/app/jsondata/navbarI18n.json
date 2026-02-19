@@ -1,0 +1,50 @@
+{
+  "languages": [
+    { "value": "en", "label": "ENG" },
+    { "value": "hi", "label": "HIN" },
+    { "value": "gu", "label": "GUJ" }
+  ],
+  "labels": {
+    "en": {
+      "location": "Location",
+      "getApp": "Get the App",
+      "login": "Login",
+      "links": {
+        "/": "Home",
+        "/about-us": "About",
+        "/solution": "Solution",
+        "/blogs": "Blogs",
+        "/partner": "Partner",
+        "/contact": "Contact"
+      }
+    },
+    "hi": {
+      "location": "à¤²à¥‹à¤•à¥‡à¤¶à¤¨",
+      "getApp": "à¤à¤ª à¤¡à¤¾à¤‰à¤¨à¤²à¥‹à¤¡",
+      "login": "à¤²à¥‰à¤—à¤¿à¤¨",
+      "links": {
+        "/": "à¤¹à¥‹à¤®",
+        "/about-us": "à¤¹à¤®à¤¾à¤°à¥‡ à¤¬à¤¾à¤°à¥‡ à¤®à¥‡à¤‚",
+        "/solution": "à¤¸à¤®à¤¾à¤§à¤¾à¤¨",
+        "/blogs": "à¤¬à¥à¤²à¥‰à¤—",
+        "/partner": "à¤ªà¤¾à¤°à¥à¤Ÿà¤¨à¤°",
+        "/contact": "à¤¸à¤‚à¤ªà¤°à¥à¤•"
+      }
+    },
+    "gu": {
+      "location": "àª¸à«àª¥àª¾àª¨",
+      "getApp": "àªàªª àª®à«‡àª³àªµà«‹",
+      "login": "àª²à«‹àª—àª¿àª¨",
+      "links": {
+        "/": "àª¹à«‹àª®",
+        "/about-us": "àª…àª®àª¾àª°àª¾ àªµàª¿àª¶à«‡",
+        "/solution": "àª¸à«‹àª²à«àª¯à«àª¶àª¨",
+        "/blogs": "àª¬à«àª²à«‹àª—à«àª¸",
+        "/partner": "àªªàª¾àª°à«àªŸàª¨àª°",
+        "/contact": "àª¸àª‚àªªàª°à«àª•"
+      }
+    }
+  }
+}
+
+

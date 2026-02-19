@@ -1,0 +1,71 @@
+{
+  "hero": {
+    "title": "Our Services",
+    "subtitle": "A complete platform for subscribers and vehicle service providers."
+  },
+  "intro": {
+    "badge": "Want to scale your vehicle business?",
+    "description": "SeaNeB helps buyers discover trusted options and helps providers get structured lead flow with better conversion."
+  },
+  "segments": [
+    {
+      "title": "For Buyers",
+      "items": [
+        "Find nearby verified providers quickly.",
+        "Compare profiles, ratings, and pricing in one place.",
+        "Choose your preferred plan or option.",
+        "Direct contact without unnecessary middle layers."
+      ]
+    },
+    {
+      "title": "For Vehicle Providers",
+      "items": [
+        "Direct customer connection with faster response.",
+        "Manage leads and listings with one workflow.",
+        "Simple plan-based onboarding and visibility.",
+        "Grow local reputation through profile trust signals."
+      ]
+    }
+  ],
+  "featureColumns": [
+    {
+      "title": "Buyer Experience",
+      "items": [
+        "Find Services Near You",
+        "Compare Offers",
+        "Hassle-free Subscription",
+        "Track Orders & Updates",
+        "Ratings and Reviews"
+      ]
+    },
+    {
+      "title": "Provider Growth",
+      "items": [
+        "Direct Contact",
+        "Efficient Operations",
+        "Subscription Management",
+        "Payment Collection",
+        "Customer Retention Tools"
+      ]
+    }
+  ],
+  "faq": [
+    {
+      "q": "What services does SeaNeB provide?",
+      "a": "SeaNeB offers discovery, comparison, and direct customer-provider connection for local vehicle businesses."
+    },
+    {
+      "q": "How can providers get started?",
+      "a": "Providers can register their business, complete profile details, and choose a suitable plan."
+    },
+    {
+      "q": "How can customers contact support?",
+      "a": "Customers can reach support through the contact page and listing support channels."
+    }
+  ],
+  "cta": {
+    "title": "Explore SeaNeB services in your local area.",
+    "subtitle": "Join and discover practical, trusted auto services.",
+    "button": "SeaNeBAutos.App"
+  }
+}
