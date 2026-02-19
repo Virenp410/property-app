@@ -1,0 +1,16 @@
+{
+  "location": "Location",
+  "getApp": "Get the App",
+  "login": "Login",
+  "language": "Language",
+  "registerBusiness": "Register Your Business",
+  "switchDealer": "Switch to Dealer Profile",
+  "links": {
+    "/": "Home",
+    "/about-us": "About",
+    "/solution": "Solution",
+    "/blogs": "Blogs",
+    "/partner": "Partner",
+    "/contact": "Contact"
+  }
+}

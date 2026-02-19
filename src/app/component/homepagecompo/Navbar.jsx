@@ -9,7 +9,9 @@ import LangSelect from "../LangSelect";
 import { getCookie, getJsonCookie, setCookie } from "@/app/services/cookieStore";
 import { getCurrentUserProfile } from "@/app/services/user.services";
 import navbarLinks from "../../jsondata/navbarLinks.json";
-import navbarI18n from "../../jsondata/navbarI18n.json";
+import navbarEn from "@/app/constant/i18n/navbar/en.json";
+import navbarHi from "@/app/constant/i18n/navbar/hi.json";
+import navbarGu from "@/app/constant/i18n/navbar/gu.json";
 const DEFAULT_PROFILE_SRC = "/images/profile.svg";
 
 const parseJwtPayload = (token) => {
@@ -171,7 +173,8 @@ export default function Navbar() {
   const profileMenuRef = useRef(null);
   const pathname = usePathname();
   const logoSrc = overHero ? "/logo/white-logo-2.png" : "/logo/white-logo-3.svg";
-  const i18nLabels = navbarI18n?.labels?.[lang] || navbarI18n?.labels?.en || {};
+  const navbarI18n = { en: navbarEn, hi: navbarHi, gu: navbarGu };
+  const i18nLabels = navbarI18n[lang] || navbarI18n.en || {};
   const linkLabels = i18nLabels?.links || {};
   const appLabel = i18nLabels?.getApp || "Get the App";
   const loginLabel = i18nLabels?.login || "Login";
@@ -181,8 +184,8 @@ export default function Navbar() {
     ? `${authAppUrl}/auth/dealerdash`
     : `${authAppUrl}/auth/business-reg`;
   const businessActionLabel = isBusinessRegistered
-    ? "Switch to Dealer Profile"
-    : "Register Your Business";
+    ? i18nLabels?.switchDealer || "Switch to Dealer Profile"
+    : i18nLabels?.registerBusiness || "Register Your Business";
 
   useEffect(() => {
     const savedLang = String(window.localStorage.getItem("app_lang") || "").trim();
@@ -409,7 +412,7 @@ export default function Navbar() {
       {menuOpen && (
         <div className="mobile-menu">
           <div className="mobile-lang-row">
-            <span>Language</span>
+            <span>{i18nLabels?.language || "Language"}</span>
             <div className="nav-lang-wrap mobile-lang-wrap" aria-label="Language">
               <LangSelect value={lang} onChange={handleLangChange} />
             </div>

@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
-import { businesses } from "@/app/data/businesses";
 import Navbar from "@/app/component/homepagecompo/Navbar";
 import Footer from "@/app/component/homepagecompo/Footer";
 import StateList from "@/app/component/homepagecompo/StateList";
@@ -46,6 +45,23 @@ async function fetchLocation(path) {
   }
 }
 
+async function fetchBusinessDetail(seanebId) {
+  try {
+    const id = String(seanebId || "").trim().toLowerCase();
+    if (!id) return null;
+    const res = await fetch(`${LOCATION_API_BASE}/business/${id}`, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      next: { revalidate: 300 },
+    });
+    if (!res.ok) return null;
+    const payload = await res.json();
+    return payload?.success && payload?.data ? payload.data : null;
+  } catch {
+    return null;
+  }
+}
+
 const mapCountry = (item) => ({
   code: String(item?.country_slug || "").toLowerCase(),
   name: String(item?.country_name || "").trim(),
@@ -74,6 +90,54 @@ const mapBusiness = (item) => ({
   features: Array.isArray(item?.features) ? item.features : [],
 });
 
+const mapBusinessDetail = (detail, fallback) => {
+  const branch = detail || {};
+  const business = branch?.Business || {};
+  const area = branch?.Area || {};
+  const city = area?.City || {};
+  const state = city?.State || {};
+  const country = state?.Country || {};
+  const mergedName = String(
+    business?.display_name ||
+      business?.business_name ||
+      fallback?.name ||
+      "Business"
+  ).trim();
+  const mergedSlug = String(
+    branch?.seaneb_id ||
+      fallback?.slug ||
+      ""
+  )
+    .trim()
+    .toLowerCase() || slugify(mergedName);
+
+  const locationParts = [
+    String(area?.area_name || "").trim(),
+    String(city?.city_name || "").trim(),
+    String(state?.state_name || "").trim(),
+    String(country?.country_name || "").trim(),
+  ].filter(Boolean);
+
+  return {
+    ...fallback,
+    slug: mergedSlug,
+    name: mergedName,
+    address:
+      String(branch?.address || "").trim() ||
+      String(branch?.landmark || "").trim() ||
+      (locationParts.length ? locationParts.join(", ") : fallback?.address || "Address not available"),
+    phone:
+      String(branch?.primary_number || "").trim() ||
+      String(branch?.whatsapp_number || "").trim() ||
+      fallback?.phone ||
+      "Not available",
+    description:
+      String(branch?.about_branch || "").trim() ||
+      fallback?.description ||
+      "Business details are available on request.",
+  };
+};
+
 async function getCountries() {
   return (await fetchLocation("/countries")).map(mapCountry).filter((c) => c.code);
 }
@@ -89,23 +153,33 @@ async function getCities(countrySlug, stateSlug) {
 }
 
 async function getCityBusinesses(countrySlug, stateSlug, citySlug) {
-  return (await fetchLocation(`/${countrySlug}/${stateSlug}/${citySlug}/businesses`)).map(mapBusiness);
+  const baseList = (await fetchLocation(`/${countrySlug}/${stateSlug}/${citySlug}/businesses`)).map(mapBusiness);
+  if (!baseList.length) return [];
+
+  const enriched = await Promise.all(
+    baseList.map(async (item) => {
+      const detail = await fetchBusinessDetail(item.slug);
+      if (!detail) return item;
+      return mapBusinessDetail(detail, item);
+    })
+  );
+
+  return enriched;
 }
 
 async function findBusinessBySlugFromApi(businessSlug) {
-  const countries = await getCountries();
-  for (const country of countries) {
-    const states = await getStates(country.code);
-    for (const state of states) {
-      const cities = await getCities(country.code, state.slug);
-      for (const city of cities) {
-        const cityBusinesses = await getCityBusinesses(country.code, state.slug, city.slug);
-        const match = cityBusinesses.find((item) => item.slug === businessSlug);
-        if (match) return match;
-      }
-    }
-  }
-  return null;
+  const detail = await fetchBusinessDetail(businessSlug);
+  if (!detail) return null;
+  return mapBusinessDetail(detail, {
+    slug: String(businessSlug || "").toLowerCase(),
+    name: "",
+    rating: "N/A",
+    reviews: 0,
+    address: "Address not available",
+    phone: "Not available",
+    description: "Business details are available on request.",
+    features: [],
+  });
 }
 
 async function resolveStateByRoute(countrySlug, routeStateSlug) {
@@ -130,14 +204,6 @@ async function resolveCityByRoute(countrySlug, routeCitySlug) {
   return null;
 }
 
-function findBusinessBySlug(businessSlug) {
-  for (const areaSlug of Object.keys(businesses)) {
-    const found = (businesses[areaSlug] || []).find((b) => b.slug === businessSlug);
-    if (found) return found;
-  }
-  return null;
-}
-
 export async function generateMetadata({ params }) {
   const resolved = await params;
   const slug = (resolved?.slug || []).map((s) => String(s).toLowerCase());
@@ -148,7 +214,7 @@ export async function generateMetadata({ params }) {
     const countries = await getCountries();
     const country = countries.find((c) => c.code === first);
     if (country) return createMeta({ title: `Pre-owned Cars in ${country.name}`, description: `Browse dealers in ${country.name}.`, path: `/${first}` });
-    const business = findBusinessBySlug(first);
+    const business = await findBusinessBySlugFromApi(first);
     if (business) return createMeta({ title: business.name, description: business.description, path: `/${first}` });
     return {};
   }
@@ -174,8 +240,6 @@ export default async function DynamicPage({ params }) {
     const countries = await getCountries();
     const country = countries.find((c) => c.code === first);
     if (country) return <CountryPage country={country} />;
-    const business = findBusinessBySlug(first);
-    if (business) return <BusinessDetailPage business={business} />;
     const apiBusiness = await findBusinessBySlugFromApi(first);
     if (apiBusiness) return <BusinessDetailPage business={apiBusiness} />;
     return notFound();
