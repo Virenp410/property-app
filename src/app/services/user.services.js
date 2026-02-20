@@ -118,7 +118,7 @@ const extractUserProfile = (payload) => {
   };
 };
 
-const PRODUCT_KEY = "auto";
+const PRODUCT_KEY = String(process.env.NEXT_PUBLIC_PRODUCT_KEY || "auto").trim();
 const PROFILE_ENDPOINTS = [
   process.env.NEXT_PUBLIC_USER_PROFILE_ENDPOINT || "",
   "/v1/profile/me",
@@ -136,9 +136,8 @@ export const getCurrentUserProfile = async () => {
       });
       const payload = res?.data || {};
       const profile = extractUserProfile(payload);
-      const displayName = profile.displayName;
-      if (displayName) {
-        return { displayName, payload, profile };
+      if (profile.displayName || profile.seanebId) {
+        return { displayName: profile.displayName, payload, profile };
       }
     } catch (err) {
       lastError = err;

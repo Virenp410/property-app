@@ -8,6 +8,7 @@ import AutoComplete from "@/app/component/AutoComplete";
 import PrimaryButton from "@/app/component/PrimaryButton";
 import useTranslation from "@/app/hook/useTranslation";
 import useDebounce from "@/app/hook/useDebaunce";
+import api from "@/app/services/api";
 import { sendEmailOtp, sendOtp, verifyEmailOtp } from "@/app/services/otp.services";
 import {
   createBusiness,
@@ -18,7 +19,6 @@ import {
 } from "@/app/services/business.services";
 import { checkSeanebId } from "@/app/services/auth.services";
 import { getCategories } from "@/app/services/category.services";
-import { getCurrentUserProfile } from "@/app/services/user.services";
 import {
   getCookie,
   setCookie,
@@ -66,6 +66,7 @@ const AUTO_MAIN_CATEGORY_FALLBACK = [
 ];
 
 const MIN_BUSINESS_AUTOCOMPLETE_CHARS = 3;
+const PRODUCT_KEY = String(process.env.NEXT_PUBLIC_PRODUCT_KEY || "auto").trim() || "auto";
 const normalizeBusinessLabel = (value) =>
   String(value || "")
     .split(",")[0]
@@ -213,40 +214,18 @@ export default function BusinessRegistrationPage() {
   const [branchId, setBranchId] = useState("");
   const [sessionExpired, setSessionExpired] = useState(false);
   const [businessCheckDone, setBusinessCheckDone] = useState(false);
-  const [forceNewBusinessFlow, setForceNewBusinessFlow] = useState(null);
   const submitLockRef = useRef(false);
   const businessAutocompleteRef = useRef(null);
   const debouncedBusinessName = useDebounce(form.business_name, 350);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const query = new URLSearchParams(window.location.search || "");
-    setForceNewBusinessFlow(String(query.get("new_business") || "").trim() === "1");
-  }, []);
-
-  useEffect(() => {
-    if (forceNewBusinessFlow !== true) return;
-    removeCookie("business_reg_draft");
-    setSeanebVerified(false);
-    setForm((prev) => ({
-      ...prev,
-      business_name: "",
-      display_name: "",
-      seaneb_id: "",
-    }));
-  }, [forceNewBusinessFlow]);
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const phoneRegex = /^\d{10,15}$/;
   const seanebRegex = /^[a-z0-9-]{6,30}$/;
   const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
   const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
-  const normalizedBusinessEmail = form.business_email.trim();
-  const hasBusinessEmail = normalizedBusinessEmail.length > 0;
-  const isBusinessEmailFormatValid = emailRegex.test(normalizedBusinessEmail);
-  const isEmailRequirementSatisfied =
-    !hasBusinessEmail || (isBusinessEmailFormatValid && emailVerified);
+  const isValidEmail = emailRegex.test(form.business_email);
   const isValidPrimaryNumber = phoneRegex.test(form.primary_number.trim());
+  const hasBusinessEmail = String(form.business_email || "").trim().length > 0;
   const isValidSeaneb = seanebRegex.test(form.seaneb_id.trim());
   const isValidWhatsapp =
     !form.whatsapp_number.trim() || phoneRegex.test(form.whatsapp_number.trim());
@@ -258,6 +237,9 @@ export default function BusinessRegistrationPage() {
   const isPanReady = form.seaneb_id.trim() && panRegex.test(form.pan_number.trim());
   const isGstinReady = form.seaneb_id.trim() && gstRegex.test(form.gstin.trim());
 
+  const isBusinessEmailStepValid =
+    !hasBusinessEmail || (isValidEmail && emailVerified);
+
   const requiredChecks = [
     form.business_name.trim(),
     form.display_name.trim(),
@@ -265,7 +247,7 @@ export default function BusinessRegistrationPage() {
     form.seaneb_id.trim(),
     isValidPrimaryNumber,
     mobileVerified,
-    isEmailRequirementSatisfied,
+    isBusinessEmailStepValid,
     form.address.trim(),
     form.place.place_id,
     form.main_category_id,
@@ -285,7 +267,7 @@ export default function BusinessRegistrationPage() {
     isValidPrimaryNumber &&
     mobileVerified &&
     isValidWhatsapp &&
-    isEmailRequirementSatisfied &&
+    isBusinessEmailStepValid &&
     hasBranchSummary &&
     form.address.trim() &&
     form.place.place_id &&
@@ -372,15 +354,6 @@ export default function BusinessRegistrationPage() {
     }
   }, [form.primary_number]);
 
-  useEffect(() => {
-    const normalizedName = normalizeBusinessLabel(form.business_name);
-    if (!normalizedName) return;
-    setForm((prev) => {
-      if (prev.display_name.trim()) return prev;
-      return { ...prev, display_name: normalizedName };
-    });
-  }, [form.business_name]);
-
   const handlePlaceChange = (value) => {
     if (typeof value === "string") {
       setForm((prev) => ({
@@ -398,8 +371,6 @@ export default function BusinessRegistrationPage() {
     const checkExistingBusiness = async () => {
       try {
         if (!active) return;
-        if (forceNewBusinessFlow === null) return;
-        if (forceNewBusinessFlow) return;
 
         const verified = getJsonCookie("verified_mobile");
         const fromVerified = getBusinessOwnerMobileKey(
@@ -419,31 +390,6 @@ export default function BusinessRegistrationPage() {
           Boolean(normalizedCurrent) &&
           (!normalizedExisting || normalizedExisting === normalizedCurrent);
 
-        let profile = null;
-        try {
-          const profileResponse = await getCurrentUserProfile();
-          profile = profileResponse?.profile || null;
-        } catch (profileErr) {
-          if (Number(profileErr?.response?.status || 0) === 401) {
-            setSessionExpired(true);
-            return;
-          }
-        }
-
-        if (profile) {
-          if (profile.isBusinessRegistered) {
-            setCookie("business_registered", "true", { days: 365 });
-            setCookie("business_register", "true", { days: 365 });
-            setCookie("has_business_for_mobile", "true", { days: 365 });
-            setCookie("dashboard_mode", "dealer", { days: 365 });
-            if (currentMobileOwnerKey) {
-              setCookie("business_owner_mobile", currentMobileOwnerKey, { days: 365 });
-            }
-            router.replace("/auth/dealerdash");
-            return;
-          }
-        }
-
         const isBusinessRegistered =
           getCookie("business_register") === "true" ||
           getCookie("business_registered") === "true";
@@ -457,6 +403,39 @@ export default function BusinessRegistrationPage() {
         const tokenBusiness = extractBusinessIdentityFromClaims(
           claims
         );
+
+        // Prefer backend profile status from /api/v1/profile/me
+        try {
+          const profileRes = await api.get("/v1/profile/me", {
+            headers: { "x-product-key": PRODUCT_KEY },
+          });
+          const profilePayload = profileRes?.data || {};
+          const profileData =
+            profilePayload?.data && typeof profilePayload.data === "object"
+              ? profilePayload.data
+              : profilePayload;
+          const profileRegistered =
+            profileData?.is_business_registered === true ||
+            profileData?.isBusinessRegistered === true;
+
+          if (profileRegistered) {
+            setCookie("business_registered", "true", { days: 365 });
+            setCookie("business_register", "true", { days: 365 });
+            setCookie("has_business_for_mobile", "true", { days: 365 });
+            setCookie("dashboard_mode", "dealer", { days: 365 });
+            if (currentMobileOwnerKey) {
+              setCookie("business_owner_mobile", currentMobileOwnerKey, { days: 365 });
+            }
+            router.replace("/auth/dealerdash");
+            return;
+          }
+        } catch (profileErr) {
+          const profileStatus = Number(profileErr?.response?.status || 0);
+          if (profileStatus === 401) {
+            throw profileErr;
+          }
+          // Non-auth profile fetch issues should not block fallback checks below.
+        }
 
         if (
           ownerMatches &&
@@ -540,7 +519,7 @@ export default function BusinessRegistrationPage() {
     return () => {
       active = false;
     };
-  }, [router, forceNewBusinessFlow]);
+  }, [router]);
 
   useEffect(() => {
     let active = true;
@@ -662,11 +641,11 @@ export default function BusinessRegistrationPage() {
   }, [sessionExpired, router]);
 
   const requestBusinessEmailOtp = async () => {
-    if (!hasBusinessEmail || !isBusinessEmailFormatValid || sendingEmailOtp || emailVerified) return;
+    if (!isValidEmail || sendingEmailOtp || emailVerified) return;
 
     try {
       setSendingEmailOtp(true);
-      await sendEmailOtp({ email: normalizedBusinessEmail, purpose: 3 });
+      await sendEmailOtp({ email: form.business_email.trim(), purpose: 3 });
       setEmailOtpSent(true);
       setErrorMessage("");
     } catch (err) {
@@ -677,18 +656,18 @@ export default function BusinessRegistrationPage() {
   };
 
   const handleVerifyBusinessEmailOtp = async () => {
-    if (!hasBusinessEmail || !isBusinessEmailFormatValid || !emailOtp || emailOtp.length < 4 || verifyingEmailOtp) return;
+    if (!emailOtp || emailOtp.length < 4 || verifyingEmailOtp) return;
 
     try {
       setVerifyingEmailOtp(true);
       await verifyEmailOtp({
-        email: normalizedBusinessEmail,
+        email: form.business_email.trim(),
         otp: emailOtp.trim(),
         purpose: 3,
       });
       setEmailVerified(true);
       setCookie("business_email_verified", "true");
-      setCookie("verified_business_email", normalizedBusinessEmail);
+      setCookie("verified_business_email", form.business_email.trim());
       setErrorMessage("");
     } catch (err) {
       setEmailVerified(false);
@@ -852,7 +831,7 @@ export default function BusinessRegistrationPage() {
     };
 
     if (hasBusinessEmail) {
-      payload.business_email = normalizedBusinessEmail;
+      payload.business_email = form.business_email.trim();
     }
 
     if (form.pan_number.trim()) {
@@ -892,7 +871,7 @@ export default function BusinessRegistrationPage() {
       }
       if (emailVerified) {
         setCookie("business_email_verified", "true", { days: 365 });
-        setCookie("verified_business_email", normalizedBusinessEmail, { days: 365 });
+        setCookie("verified_business_email", form.business_email.trim(), { days: 365 });
       }
 
       try {
@@ -1042,7 +1021,7 @@ export default function BusinessRegistrationPage() {
                               onMouseDown={() => {
                                 handleChange("business_name", businessLabel);
                                 if (!form.display_name.trim()) {
-                                  handleChange("display_name", normalizeBusinessLabel(businessLabel));
+                                  handleChange("display_name", businessLabel.split("-")[0].trim());
                                 }
                                 setShowBusinessSuggestions(false);
                               }}
@@ -1190,7 +1169,7 @@ export default function BusinessRegistrationPage() {
                 )}
               </Field>
 
-              <Field label={t.businessEmail} hint="Email is optional. If entered, verify it with OTP.">
+              <Field label={`${t.businessEmail} (Optional)`} hint="If provided, email must be verified.">
                 <div className="verify-input-wrapper">
                   <input
                     type="email"
@@ -1203,7 +1182,7 @@ export default function BusinessRegistrationPage() {
                   <button
                     type="button"
                     className={`verify-btn ${emailVerified ? "verified" : ""}`}
-                    disabled={!hasBusinessEmail || !isBusinessEmailFormatValid || sendingEmailOtp || emailVerified}
+                    disabled={!isValidEmail || sendingEmailOtp || emailVerified}
                     onClick={requestBusinessEmailOtp}
                   >
                     {sendingEmailOtp ? t.sendingOtp : emailVerified ? t.verified : t.sendOtp}
@@ -1225,12 +1204,7 @@ export default function BusinessRegistrationPage() {
                     <button
                       type="button"
                       className="verify-otp-btn"
-                      disabled={
-                        !hasBusinessEmail ||
-                        !isBusinessEmailFormatValid ||
-                        emailOtp.length < 4 ||
-                        verifyingEmailOtp
-                      }
+                      disabled={emailOtp.length < 4 || verifyingEmailOtp}
                       onClick={handleVerifyBusinessEmailOtp}
                     >
                       {verifyingEmailOtp ? t.verifying : t.verifyOtp}
@@ -1238,17 +1212,13 @@ export default function BusinessRegistrationPage() {
                   </div>
                 )}
 
-                {!hasBusinessEmail && (
-                  <p className="field-helper">Email is optional for business registration.</p>
-                )}
-                {hasBusinessEmail && !isBusinessEmailFormatValid && (
-                  <p className="field-helper error">Enter a valid email address.</p>
-                )}
-                {hasBusinessEmail && isBusinessEmailFormatValid && (
-                  <p className={`field-helper ${emailVerified ? "" : "error"}`}>
-                    {emailVerified ? t.emailVerifiedSuccess : t.emailVerifyHelper}
-                  </p>
-                )}
+                <p className={`field-helper ${emailVerified || !form.business_email.trim() ? "" : "error"}`}>
+                  {emailVerified
+                    ? t.emailVerifiedSuccess
+                    : !form.business_email.trim()
+                    ? "Email is optional."
+                    : t.emailVerifyHelper}
+                </p>
               </Field>
             </div>
           </section>

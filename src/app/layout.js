@@ -12,8 +12,16 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "SeaNeB Autos",
-  description: "Discover your perfect used car with SeaNeB Autos. Our user-friendly platform connects buyers and sellers, offering a wide selection of quality pre-owned vehicles. Experience seamless transactions, transparent pricing, and trusted reviews. Find your next car today with SeaNeB Autos.",
+  title: {
+    default: "SeaNeB Autos",
+    template: "%s | SeaNeB Autos",
+  },
+  description: "SeaNeB Autos platform for listings and authentication.",
+  icons: {
+    icon: "/logo/white-logo-2.png?v=3",
+    shortcut: "/logo/white-logo-2.png?v=3",
+    apple: "/logo/white-logo-2.png?v=3",
+  },
 };
 
 export default function RootLayout({ children }) {

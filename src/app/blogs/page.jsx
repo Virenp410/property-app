@@ -1,14 +1,9 @@
-import Navbar from "@/app/component/homepagecompo/Navbar";
-import BlogsPage from "@/app/component/navpage/BlogsPage";
-import Footer from "@/app/component/homepagecompo/Footer";
+﻿import { redirect } from "next/navigation";
 
 export default function BlogsRoutePage() {
-  return (
-    <div>
-      <Navbar />
-      <BlogsPage />
-      <Footer />
-    </div>
-  );
-}
+  const webAppUrl = String(
+    process.env.NEXT_PUBLIC_WEB_APP_URL || "http://localhost:3000"
+  ).replace(/\/$/, "");
 
+  redirect(`${webAppUrl}/blogs`);
+}

@@ -110,25 +110,22 @@ export default function RegistrationForm() {
     if (!mounted) return;
 
     const verified = getCookie("email_verified");
-    const verifiedEmail = String(getCookie("verified_email") || "").trim();
-    const currentEmail = String(form.email || "").trim();
+    const verifiedEmail = getCookie("verified_email");
 
-    if (verified === "true" && currentEmail && verifiedEmail === currentEmail) {
+    if (verified === "true" && verifiedEmail === form.email) {
       setEmailVerified(true);
     }
   }, [form.email, mounted]);
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const normalizedEmail = String(form.email || "").trim();
-  const hasEmail = normalizedEmail.length > 0;
-  const isEmailFormatValid = emailRegex.test(normalizedEmail);
-  const isEmailRequirementSatisfied =
-    !hasEmail || (isEmailFormatValid && emailVerified);
+  const hasEmail = String(form.email || "").trim().length > 0;
+  const isValidEmail = emailRegex.test(form.email);
+  const emailStepValid = !hasEmail || (isValidEmail && emailVerified);
 
   const isFormComplete =
     form.firstname &&
     form.lastname &&
-    isEmailRequirementSatisfied &&
+    emailStepValid &&
     mobileVerified &&
     form.gender &&
     form.dob &&
@@ -175,23 +172,18 @@ export default function RegistrationForm() {
     try {
       setLoading(true);
 
-      const signupPayload = {
+            const signupResponse = await signupUser({
         country_code: mobileData.country_code,
         mobile_number: mobileData.mobile_number,
         first_name: form.firstname,
         last_name: form.lastname,
+        ...(hasEmail ? { email: form.email } : {}),
         gender: form.gender.toLowerCase(),
         dob: form.dob,
         place_id: form.hometown.place_id,
         seaneb_id: form.seanebId,
         product_key: "auto",
-      };
-
-      if (hasEmail) {
-        signupPayload.email = normalizedEmail;
-      }
-
-      const signupResponse = await signupUser(signupPayload);
+      });
 
       const accessToken =
         signupResponse?.access_token || signupResponse?.data?.access_token;
@@ -278,7 +270,7 @@ export default function RegistrationForm() {
       {/* Email + Gender */}
       <div className="reg-grid">
         <div className="reg-field">
-          <label>{t.email}</label>
+          <label>{t.email} (Optional)</label>
           <div className="verify-input-wrapper">
             <input
               type="email"
@@ -294,7 +286,7 @@ export default function RegistrationForm() {
               className={`verify-btn ${
                 emailVerified ? "verified" : ""
               }`}
-              disabled={!hasEmail || !isEmailFormatValid || sendingOtp || emailVerified}
+              disabled={!isValidEmail || sendingOtp}
               onClick={async () => {
                 try {
                   setSendingOtp(true);
@@ -302,11 +294,11 @@ export default function RegistrationForm() {
                   setCookie("flow", "otp_verified");
                   setJsonCookie("otp_context", {
                     type: "email",
-                    email: normalizedEmail,
+                    email: form.email,
                     purpose: 1,
                   });
 
-                  await sendEmailOtp({ email: normalizedEmail, purpose: 1 });
+                  await sendEmailOtp({ email: form.email, purpose: 1 });
                   router.push(`/auth/otp?type=email&lang=${lang}`);
                 } finally {
                   setSendingOtp(false);

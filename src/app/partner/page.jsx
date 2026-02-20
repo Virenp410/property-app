@@ -1,14 +1,9 @@
-import Navbar from "@/app/component/homepagecompo/Navbar";
-import PartnerPage from "@/app/component/navpage/PartnerPage";
-import Footer from "@/app/component/homepagecompo/Footer";
+﻿import { redirect } from "next/navigation";
 
 export default function PartnerRoutePage() {
-  return (
-    <div>
-      <Navbar />
-      <PartnerPage />
-      <Footer />
-    </div>
-  );
-}
+  const webAppUrl = String(
+    process.env.NEXT_PUBLIC_WEB_APP_URL || "http://localhost:3000"
+  ).replace(/\/$/, "");
 
+  redirect(`${webAppUrl}/partner`);
+}
