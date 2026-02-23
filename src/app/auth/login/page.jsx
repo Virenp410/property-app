@@ -95,22 +95,22 @@ function LoginContent() {
 
   return (
     <AuthLayout lang={lang} onLangChange={setLang}>
-      <h2 className="text-[24px] font-semibold text-[var(--color-black)]">{t.login}</h2>
-      <p className="mt-[6px] text-[14px] text-[var(--auth-subtle)]">{t.subtitle}</p>
+      <h2 className="text-[24px] font-semibold text-black">{t.login}</h2>
+      <p className="mt-1.5 text-[14px] text-(--auth-subtle)">{t.subtitle}</p>
 
-      <label className="mb-[6px] mt-[22px] block text-[14px] text-[var(--auth-label)]">
+      <label className="mb-1.5 mt-5.5 block text-[14px] text-(--auth-label)">
         {t.mobileLabel}
       </label>
 
-      <div className="relative flex items-center rounded-[10px] border border-[var(--auth-border)] bg-[var(--color-white)] p-[10px] focus-within:border-[var(--auth-border-strong)] focus-within:[box-shadow:0_0_0_1px_var(--auth-border-strong)]">
+      <div className="relative flex items-center rounded-[10px] border border-(--auth-border) bg-white p-2.5 focus-within:border-(--auth-border-strong) focus-within:[box-shadow:0_0_0_1px_var(--auth-border-strong)]">
         <div
-          className="flex cursor-pointer items-center gap-[6px] border-r border-r-[var(--auth-border)] pr-[18px]"
+          className="flex cursor-pointer items-center gap-1.5 border-r border-r-(--auth-border) pr-4.5"
           onClick={() => setShowCountries(!showCountries)}
         >
           <img
             src={country.flag}
             alt={country.name}
-            className="h-[14px] w-5 object-cover"
+            className="h-3.5 w-5 object-cover"
           />
           <span>{country.dialCode}</span>
           <span className="text-[12px] text-[#555555]">{"\u25BE"}</span>
@@ -118,7 +118,7 @@ function LoginContent() {
 
         <input
           type="tel"
-          className="w-full border-0 pl-[10px] text-[14px] outline-none"
+          className="w-full border-0 pl-2.5 text-[14px] outline-none"
           placeholder={t.placeholder}
           maxLength={10}
           value={mobile}
@@ -128,11 +128,11 @@ function LoginContent() {
         />
 
         {showCountries && (
-          <div className="absolute left-0 top-[58px] z-50 max-h-[260px] w-full overflow-y-auto rounded-[12px] border border-[#dddddd] bg-[var(--color-white)] shadow-[0_10px_30px_rgba(0,0,0,0.12)]">
+          <div className="absolute left-0 top-14.5 z-50 max-h-65 w-full overflow-y-auto rounded-xl border border-[#dddddd] bg-white shadow-[0_10px_30px_rgba(0,0,0,0.12)]">
             {countries.map((c) => (
               <div
                 key={c.name}
-                className="flex cursor-pointer items-center gap-[10px] border border-[var(--color-border-brand-soft)] bg-[var(--color-white)] px-3 py-[10px] text-[var(--color-brand-primary)] hover:bg-[var(--color-surface-muted)]"
+                className="flex cursor-pointer items-center gap-2.5 border border-(--color-border-brand-soft) bg-white px-3 py-2.5 text-(--color-brand-primary) hover:bg-(--color-surface-muted)"
                 onClick={() => {
                   setCountry(c);
                   setShowCountries(false);
@@ -141,7 +141,7 @@ function LoginContent() {
                 <img
                   src={c.flag}
                   alt={c.name}
-                  className="h-4 w-[22px] object-cover"
+                  className="h-4 w-5.5 object-cover"
                 />
                 <span className="flex-1 text-[14px]">{c.name}</span>
                 <span className="text-[13px] text-[#555555]">{c.dialCode}</span>
@@ -151,8 +151,8 @@ function LoginContent() {
         )}
       </div>
 
-      <div className="mt-[18px] flex gap-5">
-        <label className="flex cursor-pointer items-center gap-[6px] text-[14px] text-[var(--auth-label)]">
+      <div className="mt-4.5 flex gap-5">
+        <label className="flex cursor-pointer items-center gap-1.5 text-[14px] text-(--auth-label)">
           <input
             type="radio"
             checked={method === "sms"}
@@ -161,7 +161,7 @@ function LoginContent() {
           {t.viaSms}
         </label>
 
-        <label className="flex cursor-pointer items-center gap-[6px] text-[14px] text-[var(--auth-label)]">
+        <label className="flex cursor-pointer items-center gap-1.5 text-[14px] text-(--auth-label)">
           <input
             type="radio"
             checked={method === "whatsapp"}
