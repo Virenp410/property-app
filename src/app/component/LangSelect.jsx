@@ -8,7 +8,7 @@ const LANG_OPTIONS = [
   { label: "GUJ", value: "gu" },
 ];
 
-export default function LangSelect({ value, onChange }) {
+export default function LangSelect({ value, onChange, variant = "lang" }) {
   const normalizedValue = value === "guj" ? "gu" : value;
 
   return (
@@ -16,7 +16,7 @@ export default function LangSelect({ value, onChange }) {
       value={normalizedValue}
       onChange={onChange}
       options={LANG_OPTIONS}
-      className="lang-dropdown"
+      variant={variant}
     />
   );
 }

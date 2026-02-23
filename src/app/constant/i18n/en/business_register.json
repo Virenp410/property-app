@@ -57,5 +57,17 @@
   "submitting": "Submitting...",
   "businessRegisterSuccess": "Business registered successfully.",
   "businessRegisterError": "Unable to register business. Please check details.",
-  "otpResendTooFast": "You are requesting OTP too frequently. Please wait."
+  "otpResendTooFast": "You are requesting OTP too frequently. Please wait.",
+  "seanebIdVerifyLabel": "Verify",
+  "seanebIdCheckingLabel": "Checking...",
+  "seanebIdVerifiedLabel": "Verified",
+  "seanebIdEdit": "Edit SeaNeB ID",
+  "seanebIdLabel": "SeaNeB ID *",
+  "seanebIdPlaceholder": "username01",
+  "seanebIdFormatHelper": "6-30 characters. Lowercase letters, numbers, and hyphen (-) only.",
+  "seanebIdVerifyRequired": "Verify SeaNeB ID before submission.",
+  "seanebIdVerifiedMessage": "SeaNeB ID verified.",
+  "seanebIdExistsMessage": "SeaNeB ID already exists.",
+  "seanebIdInvalidMessage": "Invalid SeaNeB ID format.",
+  "seanebIdVerifyFailedMessage": "Unable to verify SeaNeB ID."
 }

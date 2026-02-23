@@ -3,7 +3,11 @@
 import ReactDatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
-export default function DatePicker({ value, onChange }) {
+export default function DatePicker({
+  value,
+  onChange,
+  inputClassName = "h-[44px] w-full rounded-[10px] border border-[var(--auth-border)] px-[14px] py-3 text-[14px] text-[var(--color-black)] placeholder:text-[var(--auth-placeholder)] focus:border-[var(--auth-border-strong)] focus:outline-none",
+}) {
   const today = new Date();
 
   return (
@@ -21,9 +25,10 @@ export default function DatePicker({ value, onChange }) {
       maxDate={today}
       dateFormat="dd-MM-yyyy"
       placeholderText="DD / MM / YYYY"
-      className="reg-input date-input"
-      wrapperClassName="date-picker-wrapper"
-      popperClassName="date-picker-popper"
+      className={inputClassName}
+      wrapperClassName="w-full"
+      popperClassName="z-[9999]"
+      popperPlacement="bottom-start"
       showMonthDropdown
       showYearDropdown
       dropdownMode="select"

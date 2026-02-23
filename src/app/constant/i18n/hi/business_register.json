@@ -57,5 +57,17 @@
   "submitting": "सबमिट किया जा रहा है...",
   "businessRegisterSuccess": "व्यवसाय सफलतापूर्वक पंजीकृत हो गया।",
   "businessRegisterError": "व्यवसाय पंजीकरण नहीं हो सका। कृपया विवरण जांचें।",
-  "otpResendTooFast": "आप बहुत जल्दी ओटीपी मांग रहे हैं। कृपया प्रतीक्षा करें।"
+  "otpResendTooFast": "आप बहुत जल्दी ओटीपी मांग रहे हैं। कृपया प्रतीक्षा करें।",
+  "seanebIdVerifyLabel": "सत्यापित करें",
+  "seanebIdCheckingLabel": "जांच की जा रही है...",
+  "seanebIdVerifiedLabel": "सत्यापित",
+  "seanebIdEdit": "SeaNeB ID संपादित करें",
+  "seanebIdLabel": "SeaNeB ID *",
+  "seanebIdPlaceholder": "username01",
+  "seanebIdFormatHelper": "6-30 अक्षर। केवल लोअरकेस अक्षर, अंक और हाइफ़न (-) का उपयोग करें।",
+  "seanebIdVerifyRequired": "सबमिट करने से पहले SeaNeB ID सत्यापित करें।",
+  "seanebIdVerifiedMessage": "SeaNeB ID सत्यापित हो गई है।",
+  "seanebIdExistsMessage": "SeaNeB ID पहले से मौजूद है।",
+  "seanebIdInvalidMessage": "SeaNeB ID का प्रारूप अमान्य है।",
+  "seanebIdVerifyFailedMessage": "SeaNeB ID सत्यापित नहीं हो सकी।"
 }

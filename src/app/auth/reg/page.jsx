@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import AuthLayout from "@/app/component/AuthLayout";
 import useTranslation from "@/app/hook/useTranslation";
@@ -14,6 +14,7 @@ import SeanebIdField from "@/app/component/SeanebId";
 import { signupUser } from "@/app/services/auth.services";
 import { sendEmailOtp } from "@/app/services/otp.services";
 import { setSessionTokens } from "@/app/services/api";
+import { PRODUCT_KEY } from "@/app/services/productKey";
 import {
   getCookie,
   setCookie,
@@ -33,8 +34,18 @@ const EMPTY_FORM = {
   agree: false,
 };
 
-export default function RegistrationForm() {
+const getSafeInternalRedirectPath = (value) => {
+  const next = String(value || "").trim();
+  if (!next) return "";
+  if (!next.startsWith("/")) return "";
+  if (next.startsWith("//")) return "";
+  if (next.startsWith("/auth/login")) return "";
+  return next;
+};
+
+function RegistrationFormContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [lang, setLang] = useState("en");
   const t = useTranslation(lang);
 
@@ -50,6 +61,11 @@ export default function RegistrationForm() {
 
   useEffect(() => {
     setMounted(true);
+
+    const queryLang = String(searchParams?.get("lang") || "").trim().toLowerCase();
+    if (queryLang) {
+      setLang(queryLang);
+    }
 
     const fromOtp = getCookie("flow") === "otp_verified";
 
@@ -75,7 +91,7 @@ export default function RegistrationForm() {
         // ignore invalid cached JSON
       }
     }
-  }, [router]);
+  }, [router, searchParams]);
 
   /* clear draft on refresh */
   useEffect(() => {
@@ -182,7 +198,7 @@ export default function RegistrationForm() {
         dob: form.dob,
         place_id: form.hometown.place_id,
         seaneb_id: form.seanebId,
-        product_key: "auto",
+        product_key: PRODUCT_KEY,
       });
 
       const accessToken =
@@ -214,10 +230,21 @@ export default function RegistrationForm() {
       removeCookie("verified_email");
       // Keep verified_mobile/otp_context so dealer business flow can re-send
       // mobile OTP with correct country code.
-
+      const redirectFromQuery = searchParams?.get("redirect_to");
+      const redirectFromCookie = getCookie("post_auth_redirect");
+      const postAuthRedirect =
+        getSafeInternalRedirectPath(redirectFromQuery) ||
+        getSafeInternalRedirectPath(redirectFromCookie);
+      if (postAuthRedirect) {
+        setCookie("post_auth_redirect", postAuthRedirect, { days: 1 });
+        router.push(
+          `/auth/success?lang=${lang}&redirect_to=${encodeURIComponent(postAuthRedirect)}`
+        );
+        return;
+      }
       router.push(`/auth/success?lang=${lang}`);
     } catch (err) {
-      alert(err?.response?.data?.message || "Registration failed");
+      alert(err?.response?.data?.message || "Registration failed" || response?.data?.error?.message);
     } finally {
       setLoading(false);
     }
@@ -239,15 +266,15 @@ export default function RegistrationForm() {
       showBack={true}
       backFallback="/auth/otp"
     >
-      <h2 className="reg-title">{t.completeProfile}</h2>
-      <p className="reg-subtitle">{t.profileSubtitle}</p>
+      <h2 className="text-[26px] font-semibold text-[var(--color-black)]">{t.completeProfile}</h2>
+      <p className="mt-[6px] text-[14px] text-[var(--auth-muted)]">{t.profileSubtitle}</p>
 
       {/* First + Last */}
-      <div className="reg-grid">
-        <div className="reg-field">
-          <label>{t.firstname}</label>
+      <div className="mb-5 mt-[22px] grid grid-cols-2 gap-[22px] [@media(max-width:640px)]:grid-cols-1">
+        <div className="min-w-0">
+          <label className="mb-[6px] block text-[14px] text-[var(--auth-field-label)]">{t.firstname}</label>
           <input
-            className="reg-input"
+            className="h-[44px] w-full rounded-[10px] border border-[var(--auth-border)] px-[14px] py-3 text-[14px] text-[var(--color-black)] placeholder:text-[var(--auth-placeholder)] focus:border-[var(--auth-border-strong)] focus:outline-none"
             value={form.firstname}
             onChange={(e) =>
               handleChange("firstname", e.target.value)
@@ -255,10 +282,10 @@ export default function RegistrationForm() {
           />
         </div>
 
-        <div className="reg-field">
-          <label>{t.lastname}</label>
+        <div className="min-w-0">
+          <label className="mb-[6px] block text-[14px] text-[var(--auth-field-label)]">{t.lastname}</label>
           <input
-            className="reg-input"
+            className="h-[44px] w-full rounded-[10px] border border-[var(--auth-border)] px-[14px] py-3 text-[14px] text-[var(--color-black)] placeholder:text-[var(--auth-placeholder)] focus:border-[var(--auth-border-strong)] focus:outline-none"
             value={form.lastname}
             onChange={(e) =>
               handleChange("lastname", e.target.value)
@@ -268,13 +295,13 @@ export default function RegistrationForm() {
       </div>
 
       {/* Email + Gender */}
-      <div className="reg-grid">
-        <div className="reg-field">
-          <label>{t.email} (Optional)</label>
-          <div className="verify-input-wrapper">
+      <div className="mb-5 mt-[22px] grid grid-cols-2 gap-[22px] [@media(max-width:640px)]:grid-cols-1">
+        <div className="min-w-0">
+          <label className="mb-[6px] block text-[14px] text-[var(--auth-field-label)]">{t.email} (Optional)</label>
+          <div className="relative w-full">
             <input
               type="email"
-              className="reg-input"
+              className="h-[44px] w-full rounded-[10px] border border-[var(--auth-border)] px-[14px] py-3 pr-[90px] text-[14px] text-[var(--color-black)] placeholder:text-[var(--auth-placeholder)] focus:border-[var(--auth-border-strong)] focus:outline-none"
               value={form.email}
               onChange={(e) =>
                 handleChange("email", e.target.value)
@@ -283,8 +310,10 @@ export default function RegistrationForm() {
 
             <button
               type="button"
-              className={`verify-btn ${
-                emailVerified ? "verified" : ""
+              className={`absolute right-[10px] top-1/2 h-8 -translate-y-1/2 whitespace-nowrap rounded-[6px] border px-3 text-[12px] ${
+                emailVerified
+                  ? "cursor-default border-[var(--color-success)] bg-[var(--color-success)] text-[var(--color-white)]"
+                  : "border-[var(--auth-border-light)] bg-[var(--color-white)] text-[var(--color-black)] hover:bg-[var(--color-surface-muted)]"
               }`}
               disabled={!isValidEmail || sendingOtp}
               onClick={async () => {
@@ -309,8 +338,8 @@ export default function RegistrationForm() {
             </button>
           </div>
         </div>
-        <div className="reg-field">
-          <label>{t.gender}</label>
+        <div className="min-w-0">
+          <label className="mb-[6px] block text-[14px] text-[var(--auth-field-label)]">{t.gender}</label>
           <CustomDropdown
             value={form.gender}
             onChange={(val) =>
@@ -323,9 +352,9 @@ export default function RegistrationForm() {
       </div>
 
       {/* Hometown */}
-      <div className="reg-grid">
-        <div className="reg-field">
-          <label>{t.hometown}</label>
+      <div className="mb-5 mt-[22px] grid grid-cols-2 gap-[22px] [@media(max-width:640px)]:grid-cols-1">
+        <div className="min-w-0">
+          <label className="mb-[6px] block text-[14px] text-[var(--auth-field-label)]">{t.hometown}</label>
           <AutoComplete
             value={form.hometown.label}
             onChange={(val) =>
@@ -336,8 +365,8 @@ export default function RegistrationForm() {
           />
         </div>
 
-        <div className="reg-field">
-          <label>{t.dob}</label>
+        <div className="min-w-0">
+          <label className="mb-[6px] block text-[14px] text-[var(--auth-field-label)]">{t.dob}</label>
           <DatePicker
             value={form.dob}
             onChange={(val) =>
@@ -354,9 +383,26 @@ export default function RegistrationForm() {
         }
         verified={seanebVerified}
         setVerified={setSeanebVerified}
+        label={t.seanebIdLabel || "SeaNeB ID *"}
+        placeholder={t.seanebIdPlaceholder || "username01"}
+        verifyLabel={t.seanebIdVerifyLabel || t.verify || "Verify"}
+        checkingLabel={t.seanebIdCheckingLabel || t.verifying || "Checking..."}
+        verifiedLabel={`${t.seanebIdVerifiedLabel || t.verified || "Verified"} \u2713`}
+        editLabel={t.seanebIdEdit || "Edit SeaNeB ID"}
+        formatHint={
+          t.seanebIdFormatHelper ||
+          "6-30 characters. Lowercase letters, numbers, and hyphen (-) only."
+        }
+        verifiedMessage={t.seanebIdVerifiedMessage || "SeaNeB ID verified."}
+        existsMessage={t.seanebIdExistsMessage || "SeaNeB ID already exists."}
+        invalidMessage={t.seanebIdInvalidMessage || "Invalid SeaNeB ID format."}
+        verifyFailedMessage={t.seanebIdVerifyFailedMessage || "Unable to verify SeaNeB ID."}
+        verifyRequiredMessage={
+          t.seanebIdVerifyRequired || "Verify SeaNeB ID before submission."
+        }
       />
 
-      <label className="reg-checkbox">
+      <label className="mt-[22px] flex gap-[10px] text-[14px] text-[var(--auth-field-label)]">
         <input
           type="checkbox"
           checked={form.agree}
@@ -376,3 +422,12 @@ export default function RegistrationForm() {
     </AuthLayout>
   );
 }
+
+export default function RegistrationForm() {
+  return (
+    <Suspense fallback={null}>
+      <RegistrationFormContent />
+    </Suspense>
+  );
+}
+

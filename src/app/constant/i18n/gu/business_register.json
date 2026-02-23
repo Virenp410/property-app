@@ -57,5 +57,17 @@
   "submitting": "સબમિટ થઈ રહ્યું છે...",
   "businessRegisterSuccess": "બિઝનેસ સફળતાપૂર્વક રજીસ્ટર થયું.",
   "businessRegisterError": "બિઝનેસ રજીસ્ટર થઈ શક્યું નથી. કૃપા કરીને વિગતો તપાસો.",
-  "otpResendTooFast": "તમે ઘણી વખત ઓટીપી માંગો છો. રાહ જુઓ."
+  "otpResendTooFast": "તમે ઘણી વખત ઓટીપી માંગો છો. રાહ જુઓ.",
+  "seanebIdVerifyLabel": "ચકાસો",
+  "seanebIdCheckingLabel": "ચકાસણી ચાલુ છે...",
+  "seanebIdVerifiedLabel": "ચકાસેલ",
+  "seanebIdEdit": "SeaNeB ID સંપાદિત કરો",
+  "seanebIdLabel": "SeaNeB ID *",
+  "seanebIdPlaceholder": "username01",
+  "seanebIdFormatHelper": "6-30 અક્ષરો. ફક્ત lowercase અક્ષરો, અંકડા અને hyphen (-) નો ઉપયોગ કરો.",
+  "seanebIdVerifyRequired": "સબમિટ પહેલા SeaNeB ID ચકાસો.",
+  "seanebIdVerifiedMessage": "SeaNeB ID ચકાસાઈ ગઈ છે.",
+  "seanebIdExistsMessage": "SeaNeB ID પહેલેથી મૌજૂદ છે.",
+  "seanebIdInvalidMessage": "SeaNeB ID નું ફોરમેટ અમાન્ય છે.",
+  "seanebIdVerifyFailedMessage": "SeaNeB ID ચકાસણી નિષ્ફળ રહી."
 }

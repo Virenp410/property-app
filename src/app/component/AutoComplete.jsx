@@ -4,10 +4,20 @@ import { useState, useEffect, useRef } from "react";
 import { getCities } from "@/app/services/city.services";
 import useDebounce from "@/app/hook/useDebaunce";
 
+const formatCityLabel = (city) =>
+  [city?.city_name, city?.state_name, city?.country_name]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(", ");
+
 export default function AutoComplete({
   value,
   onChange,
   placeholder,
+  wrapperClassName = "relative",
+  inputClassName = "h-[44px] w-full rounded-[10px] border border-[var(--auth-border)] px-[14px] py-3 text-[14px] text-[var(--color-black)] placeholder:text-[var(--auth-placeholder)] focus:border-[var(--auth-border-strong)] focus:outline-none",
+  suggestionBoxClassName = "absolute left-0 top-full z-[60] max-h-[200px] w-full overflow-y-auto rounded-b-[10px] border border-t-0 border-[var(--auth-border)] bg-[var(--color-white)] shadow-[0_10px_25px_rgba(0,0,0,0.12)]",
+  suggestionItemClassName = "cursor-pointer px-[14px] py-[10px] text-[14px] text-[var(--color-text-heading)] hover:bg-[var(--color-surface-muted)]",
 }) {
   const [open, setOpen] = useState(false);
   const [cities, setCities] = useState([]);
@@ -57,10 +67,10 @@ export default function AutoComplete({
   }, []);
 
   return (
-    <div className="autocomplete" ref={wrapperRef}>
+    <div className={wrapperClassName} ref={wrapperRef}>
       <input
         type="text"
-        className="reg-input"
+        className={inputClassName}
         placeholder={placeholder}
         value={value}
         onChange={(e) => {
@@ -71,9 +81,9 @@ export default function AutoComplete({
       />
 
       {open && (
-        <div className="suggestion-box">
+        <div className={suggestionBoxClassName}>
           {loading && (
-            <div className="suggestion-item">
+            <div className={suggestionItemClassName}>
               Loading...
             </div>
           )}
@@ -81,7 +91,7 @@ export default function AutoComplete({
           {!loading &&
             cities.length === 0 &&
             debouncedValue?.length >= 2 && (
-              <div className="suggestion-item">
+              <div className={suggestionItemClassName}>
                 No cities found
               </div>
             )}
@@ -89,11 +99,12 @@ export default function AutoComplete({
           {!loading &&
             cities.map((city) => (
               <div
-                key={city.place_id}
-                className="suggestion-item"
+                key={`${city.place_id}-${city.city_name}`}
+                className={suggestionItemClassName}
                 onMouseDown={() => {
+                  const label = formatCityLabel(city) || String(city?.city_name || "").trim();
                   onChange({
-                    label: `${city.city_name}, ${city.state_name}, ${city.country_name}`,
+                    label,
                     place_id: city.place_id,
                   });
                   setOpen(false);

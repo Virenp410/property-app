@@ -1,12 +1,12 @@
-# auto-web
+# auto-app
 
-Public SeaNeB Autos website app.
+Auth and dashboard app for SeaNeB Autos.
 
-## Included from current project
-- Homepage and public routes (`about`, `blogs`, `contact`, `forum`, `partner`, `solution`, slug pages)
-- Shared UI components (web-only)
-- Public content/data (`jsondata`, `data`, `constant`)
-- Web-specific hooks/services used by public UI
+## Included
+- Auth flows (`/auth/login`, `/auth/otp`, `/auth/reg`, `/auth/business-reg`)
+- User and dealer dashboard routes
+- Auth services/hooks and i18n files
+- Public route wrappers that redirect to `auto-web`
 
 ## Run
 ```bash

@@ -1,8 +1,7 @@
 import api from "./api";
+import { PRODUCT_KEY, PRODUCT_NAME } from "./productKey";
 
-const PRODUCT_KEY = "auto";
-const PRODUCT_NAME = "Auto";
-const PRODUCT_KEY_CANDIDATES = [PRODUCT_KEY, "seaneb"];
+const PRODUCT_KEY_CANDIDATES = [PRODUCT_KEY];
 
 const extractProductList = (data) => {
   if (Array.isArray(data)) return data;
@@ -170,3 +169,4 @@ export const getCategories = async () => {
 
   return { categories: [] };
 };
+

@@ -1,7 +1,7 @@
 import axios from "axios"
-import api from "./api"
-import { setSessionTokens } from "./api"
+import api, { setSessionTokens } from "./api"
 import { getCookie, setCookie } from "./cookieStore"
+import { PRODUCT_KEY, PRODUCT_NAME } from "./productKey"
 
 
 
@@ -10,14 +10,13 @@ const businessApi = axios.create({
   withCredentials: true,
 })
 
-const DEFAULT_PRODUCT_KEY = "auto"
-const DEFAULT_PRODUCT_NAME = "Auto"
-const PRODUCT_KEY_CANDIDATES = ["auto", "seaneb"]
+const DEFAULT_PRODUCT_KEY = PRODUCT_KEY
+const DEFAULT_PRODUCT_NAME = PRODUCT_NAME
+const PRODUCT_KEY_CANDIDATES = [DEFAULT_PRODUCT_KEY]
 let businessRefreshBlocked = false
 const PRODUCT_AUTO_READY_COOKIE = "product_auto_ready"
-const BUSINESS_LIST_UNAVAILABLE_COOKIE = "business_list_unavailable"
-const BUSINESS_LIST_FETCH_ENABLED =
-  String(process.env.NEXT_PUBLIC_ENABLE_BUSINESS_LIST || "false").toLowerCase() === "true"
+const ENDPOINT_MISSING_STATUS = new Set([404, 405])
+const SERVER_TRANSIENT_STATUS = new Set([502, 503, 504])
 
 const getDefaultProductKey = () => DEFAULT_PRODUCT_KEY
 const getDefaultProductName = () => DEFAULT_PRODUCT_NAME
@@ -27,11 +26,6 @@ const isProductAutoReady = () => isClientSide() && isTruthy(getCookie(PRODUCT_AU
 const markProductAutoReady = () => {
   if (isClientSide()) setCookie(PRODUCT_AUTO_READY_COOKIE, "true")
 }
-const isBusinessListUnavailable = () =>
-  isClientSide() && isTruthy(getCookie(BUSINESS_LIST_UNAVAILABLE_COOKIE))
-const markBusinessListUnavailable = () => {
-  if (isClientSide()) setCookie(BUSINESS_LIST_UNAVAILABLE_COOKIE, "true")
-}
 
 const authStore = {
   getAccessToken: () => {
@@ -39,7 +33,6 @@ const authStore = {
     return (
       getCookie("access_token_auto") ||
       getCookie("access_token") ||
-      getCookie("access_token_seaneb") ||
       getCookie("token_auto") ||
       getCookie("token") ||
       null
@@ -49,7 +42,6 @@ const authStore = {
     if (typeof window === "undefined") return null
     return (
       getCookie("csrf_token_auto") ||
-      getCookie("csrf_token_seaneb") ||
       getCookie("csrf_token") ||
       null
     )
@@ -58,7 +50,6 @@ const authStore = {
     if (typeof window === "undefined") return []
     const values = [
       getCookie("csrf_token_auto"),
-      getCookie("csrf_token_seaneb"),
       getCookie("csrf_token"),
     ]
       .map((item) => String(item || "").trim())
@@ -94,6 +85,7 @@ const bootstrapProductAuth = async () => {
           {
             headers: {
               "x-csrf-token": csrf,
+              "x-product-key": productKey,
               "Content-Type": "application/json",
             },
           }
@@ -112,7 +104,9 @@ const bootstrapProductAuth = async () => {
     }
   }
 
-  businessRefreshBlocked = true
+  if (shouldBlockBusinessSession(lastError)) {
+    businessRefreshBlocked = true
+  }
   throw lastError || new Error("Session expired. Please login again.")
 }
 
@@ -122,22 +116,37 @@ const parseErrorMessage = (err, fallback) =>
   err?.message ||
   fallback
 
+const getErrorStatus = (err) => Number(err?.response?.status || 0)
+const getErrorCode = (err) => String(err?.response?.data?.error?.code || "").toUpperCase()
+const getErrorText = (err) => String(parseErrorMessage(err, "")).toLowerCase()
+const isEndpointMissingStatus = (status) => ENDPOINT_MISSING_STATUS.has(Number(status || 0))
+const isTransientServerStatus = (status) => SERVER_TRANSIENT_STATUS.has(Number(status || 0))
+
+const hasBusinessSessionHint = () =>
+  Boolean(
+    authStore.getCsrfToken() ||
+      getCookie("refresh_token_auto") ||
+      getCookie("refresh_token")
+  )
+
+const removeEmptyStringFields = (payload = {}) => {
+  Object.keys(payload).forEach((key) => {
+    if (payload[key] === "") delete payload[key]
+  })
+  return payload
+}
+
 const limitText = (value, max) => String(value || "").trim().slice(0, max)
 
 const getProductKeyCandidates = () => {
   const preferred = String(getDefaultProductKey() || "").trim()
-  const candidates = [preferred, "auto", "seaneb"]
+  const candidates = [preferred, ...PRODUCT_KEY_CANDIDATES.map((key) => String(key || "").trim())]
   return [...new Set(candidates.filter(Boolean))]
 }
 
 const isRetryableAutocompleteError = (err) => {
-  const status = Number(err?.response?.status || 0)
-  const message = String(
-    err?.response?.data?.error?.message ||
-      err?.response?.data?.message ||
-      err?.message ||
-      ""
-  ).toLowerCase()
+  const status = getErrorStatus(err)
+  const message = getErrorText(err)
 
   if ([400, 401, 403].includes(status)) return true
   if (message.includes("unauthorized")) return true
@@ -148,14 +157,9 @@ const isRetryableAutocompleteError = (err) => {
 }
 
 const isInvalidOrInactiveProductError = (err) => {
-  const status = Number(err?.response?.status || 0)
-  const code = String(err?.response?.data?.error?.code || "").toUpperCase()
-  const message = String(
-    err?.response?.data?.error?.message ||
-      err?.response?.data?.message ||
-      err?.message ||
-      ""
-  ).toLowerCase()
+  const status = getErrorStatus(err)
+  const code = getErrorCode(err)
+  const message = getErrorText(err)
 
   if (code.includes("PRODUCT")) return true
   if (message.includes("invalid or inactive product")) return true
@@ -164,13 +168,8 @@ const isInvalidOrInactiveProductError = (err) => {
 }
 
 const isProductContextError = (err) => {
-  const status = Number(err?.response?.status || 0)
-  const message = String(
-    err?.response?.data?.error?.message ||
-      err?.response?.data?.message ||
-      err?.message ||
-      ""
-  ).toLowerCase()
+  const status = getErrorStatus(err)
+  const message = getErrorText(err)
 
   if ([401, 403].includes(status)) return true
   if (status === 400 && (message.includes("product key") || message.includes("product"))) return true
@@ -179,18 +178,31 @@ const isProductContextError = (err) => {
 }
 
 const isCsrfRequiredError = (err) => {
-  const status = Number(err?.response?.status || 0)
-  const code = String(err?.response?.data?.error?.code || "").toUpperCase()
-  const message = String(
-    err?.response?.data?.error?.message ||
-      err?.response?.data?.message ||
-      err?.message ||
-      ""
-  ).toLowerCase()
+  const status = getErrorStatus(err)
+  const code = getErrorCode(err)
+  const message = getErrorText(err)
 
   return (
     status === 403 &&
     (code.includes("CSRF") || message.includes("csrf token is required") || message.includes("csrf"))
+  )
+}
+
+const shouldBlockBusinessSession = (err) => {
+  const status = getErrorStatus(err)
+  const code = getErrorCode(err)
+  const message = getErrorText(err)
+
+  if ([401, 403].includes(status)) return true
+  if (code.includes("CSRF") || code.includes("TOKEN") || code.includes("AUTH")) return true
+
+  return (
+    message.includes("csrf token is required") ||
+    message.includes("refresh token") ||
+    message.includes("invalid refresh token") ||
+    message.includes("session expired") ||
+    message.includes("unauthorized") ||
+    message.includes("login again")
   )
 }
 
@@ -236,8 +248,8 @@ const ensureBusinessProductContext = async () => {
         return
       }
     } catch (err) {
-      const status = Number(err?.response?.status || 0)
-      if (![404, 405].includes(status)) {
+      const status = getErrorStatus(err)
+      if (!isEndpointMissingStatus(status)) {
         lastError = err
         break
       }
@@ -260,17 +272,18 @@ const ensureBusinessProductContext = async () => {
         return
       }
       lastError = err
-      if (![404, 405].includes(Number(err?.response?.status || 0))) {
+      if (!isEndpointMissingStatus(getErrorStatus(err))) {
         break
       }
     }
   }
 
-  try {
+  if (lastError) {
+    console.warn("[business.service] ensure product create failed:", lastError?.response?.data || lastError?.message || lastError)
     throw lastError
-  } catch (err) {
-    console.warn("[business.service] ensure product create failed:", err?.response?.data || err?.message || err)
   }
+
+  throw new Error("Unable to ensure product context")
 }
 
 export const ensureDefaultProductAuto = async () => {
@@ -284,56 +297,63 @@ export const ensureDefaultProductAuto = async () => {
 
 const withBusinessRecovery = async (requestFn) => {
   if (businessRefreshBlocked) {
-    throw new Error("Session expired. Please login again.")
+    const hasSessionHint = hasBusinessSessionHint()
+    if (!hasSessionHint) {
+      throw new Error("Session expired. Please login again.")
+    }
+    businessRefreshBlocked = false
   }
 
   try {
     return await requestFn()
   } catch (err) {
-    const status = Number(err?.response?.status || 0)
+    const status = getErrorStatus(err)
 
-    // Access token expired in business flow: attempt bootstrap recovery and retry once.
     if (status === 401) {
       try {
         // Try bootstrap flow which recovers product auth and tokens
         await bootstrapProductAuth()
       } catch (bootstrapErr) {
-        businessRefreshBlocked = true
-        const message = String(
-          bootstrapErr?.response?.data?.error?.message ||
-            bootstrapErr?.response?.data?.message ||
-            bootstrapErr?.message ||
-            ""
-        ).toLowerCase()
+        const message = getErrorText(bootstrapErr)
 
         const isRefreshTokenMissing =
           message.includes("refresh token") ||
           message.includes("invalid refresh token") ||
           message.includes("session expired")
 
-        if (isCsrfRequiredError(bootstrapErr) || isRefreshTokenMissing) {
-          throw new Error(parseErrorMessage(bootstrapErr, "Session expired. Please login again."))
+        const shouldBlock =
+          isCsrfRequiredError(bootstrapErr) ||
+          isRefreshTokenMissing ||
+          shouldBlockBusinessSession(bootstrapErr)
+
+        if (shouldBlock) {
+          businessRefreshBlocked = true
         }
 
         throw new Error(
           parseErrorMessage(
             bootstrapErr,
-            "Session expired. Please login again."
+            shouldBlock
+              ? "Session expired. Please login again."
+              : "Unable to refresh session. Please try again."
           )
         )
       }
 
-      // If bootstrap recovered access token, retry original request.
       if (authStore.getAccessToken()) {
         businessRefreshBlocked = false
         return requestFn()
       }
 
-      businessRefreshBlocked = true
-      throw new Error("Session expired. Please login again.")
+      const hasSessionHint = hasBusinessSessionHint()
+      businessRefreshBlocked = !hasSessionHint
+      throw new Error(
+        hasSessionHint
+          ? "Unable to refresh session. Please try again."
+          : "Session expired. Please login again."
+      )
     }
 
-    // Product context mismatch: ensure product exists, refresh token context, retry once.
     if (isInvalidOrInactiveProductError(err)) {
       await ensureBusinessProductContext()
       return requestFn()
@@ -345,10 +365,6 @@ const withBusinessRecovery = async (requestFn) => {
 
 /**
  * Business name autocomplete
- * GET /api/v1/business/autocomplete
- * Required:
- * - header: x-product-key
- * - query: input (min 2 chars)
  */
 export const getBusinessAutocomplete = async (input) => {
   const query = String(input || "").trim()
@@ -389,8 +405,8 @@ export const getBusinessAutocomplete = async (input) => {
 
     throw lastError || new Error("Business autocomplete failed")
   } catch (err) {
-    const status = Number(err?.response?.status || 0)
-    const message = String(err?.message || "").toLowerCase()
+    const status = getErrorStatus(err)
+    const message = getErrorText(err)
     if (
       [401, 403].includes(status) ||
       message.includes("session expired") ||
@@ -399,7 +415,7 @@ export const getBusinessAutocomplete = async (input) => {
     ) {
       throw new Error("Session expired. Please login again.")
     }
-    if ([500, 502, 503, 504].includes(status)) {
+    if (status === 500 || isTransientServerStatus(status)) {
       return []
     }
     console.error("[business.service] getBusinessAutocomplete failed:", parseErrorMessage(err, "Autocomplete failed"))
@@ -421,35 +437,21 @@ const getAuthHeaders = ({ includeProductKey = false, productKey } = {}) => {
 
 /**
  * Register a business for a user
- * POST /api/v1/business/create
- * Schema aligned with API docs screenshot (flat address + branch fields)
  */
 export const registerBusiness = async (data = {}) => {
   const {
     business_name,
-    businessName,
     display_name,
-    displayName,
     main_category_id,
-    mainCategoryId,
     business_type,
-    businessType,
     seaneb_id,
-    seanebId,
     primary_number,
-    primaryNumber,
     whatsapp_number,
-    whatsappNumber,
     business_email,
-    businessEmail,
     about_branch,
-    aboutBranch,
     address,
-    business_location,
-    businessLocation,
     landmark,
     place_id,
-    placeId,
     latitude,
     longitude,
     pan,
@@ -457,12 +459,11 @@ export const registerBusiness = async (data = {}) => {
     gst,
     gstin,
     product_key,
-    productKey,
   } = data
 
-  const finalBusinessName = limitText(business_name ?? businessName ?? "", 30)
-  const finalBusinessType = business_type ?? businessType
-  const finalPlaceId = String(place_id ?? placeId ?? "").trim()
+  const finalBusinessName = limitText(business_name ?? "", 30)
+  const finalBusinessType = business_type
+  const finalPlaceId = String(place_id ?? "").trim()
 
   if (!finalBusinessName) {
     return Promise.reject(new Error("Business name is required"))
@@ -476,19 +477,19 @@ export const registerBusiness = async (data = {}) => {
     return Promise.reject(new Error("Business location is required"))
   }
 
-  const effectiveProductKey = String(product_key || productKey || getDefaultProductKey()).trim()
+  const effectiveProductKey = String(product_key || getDefaultProductKey()).trim()
 
   const payload = {
     business_name: finalBusinessName,
-    display_name: limitText(display_name || displayName || finalBusinessName, 30),
-    main_category_id: (main_category_id || mainCategoryId || "").trim(),
+    display_name: limitText(display_name || finalBusinessName, 30),
+    main_category_id: String(main_category_id ?? "").trim(),
     business_type: Number.isNaN(Number(finalBusinessType)) ? finalBusinessType : Number(finalBusinessType),
-    seaneb_id: (seaneb_id || seanebId || "").trim(),
-    primary_number: String(primary_number || primaryNumber || "").trim(),
-    whatsapp_number: String(whatsapp_number || whatsappNumber || "").trim(),
-    business_email: String(business_email || businessEmail || "").trim(),
-    about_branch: (about_branch || aboutBranch || "Head office branch").trim(),
-    address: (address || business_location || businessLocation || "").trim(),
+    seaneb_id: (seaneb_id || "").trim(),
+    primary_number: String(primary_number || "").trim(),
+    whatsapp_number: String(whatsapp_number || "").trim(),
+    business_email: String(business_email || "").trim(),
+    about_branch: (about_branch || "Head office branch").trim(),
+    address: (address || "").trim(),
     landmark: String(landmark || "").trim(),
     place_id: finalPlaceId,
     latitude: latitude !== undefined && latitude !== null && latitude !== "" ? Number(latitude) : 0,
@@ -503,13 +504,22 @@ export const registerBusiness = async (data = {}) => {
   if (finalGst) payload.gst = { gstin: finalGst }
 
   // Remove empty optional fields to match backend validation expectations
-  Object.keys(payload).forEach((key) => {
-    if (payload[key] === "") delete payload[key]
-  })
+  removeEmptyStringFields(payload)
 
-  console.log("registerBusiness payload:", JSON.stringify(payload, null, 2))
+  if (process.env.NODE_ENV !== "production") {
+    const safePayload = {
+      ...payload,
+      pan: payload.pan?.pan_number
+        ? { pan_number: `***${String(payload.pan.pan_number).slice(-4)}` }
+        : payload.pan,
+      gst: payload.gst?.gstin
+        ? { gstin: `***${String(payload.gst.gstin).slice(-4)}` }
+        : payload.gst,
+    }
+    console.log("registerBusiness payload:", JSON.stringify(safePayload, null, 2))
+  }
 
-  const productKeys = [...new Set([effectiveProductKey, "seaneb", "auto"].filter(Boolean))]
+  const productKeys = [...new Set([effectiveProductKey].filter(Boolean))]
 
   let lastError = null
 
@@ -523,8 +533,8 @@ export const registerBusiness = async (data = {}) => {
       return await withBusinessRecovery(makeCreate)
     } catch (err) {
       lastError = err
-      const status = Number(err?.response?.status || 0)
-      if ([404, 405, 502, 503, 504].includes(status)) {
+      const status = getErrorStatus(err)
+      if (isEndpointMissingStatus(status) || isTransientServerStatus(status)) {
         try {
           console.warn(
             "[business.service] /business/create unavailable, falling back to /business/register"
@@ -553,78 +563,8 @@ export const registerBusiness = async (data = {}) => {
   throw new Error("Business registration failed")
 }
 
-// Backwards compatibility: some callers import `createBusiness`.
-export const createBusiness = async (data = {}) => {
-  return registerBusiness(data)
-}
-
-/**
- * Create a branch under existing business
- * POST /api/v1/business/create-branch
- */
-export const createBusinessBranch = async (data = {}) => {
-  const {
-    business_id,
-    businessId,
-    seaneb_id,
-    seanebId,
-    primary_number,
-    primaryNumber,
-    whatsapp_number,
-    whatsappNumber,
-    business_email,
-    businessEmail,
-    about_branch,
-    aboutBranch,
-    address,
-    landmark,
-    place_id,
-    placeId,
-    pan,
-    gstin,
-  } = data
-
-  const finalBusinessId = String(business_id ?? businessId ?? "").trim()
-  const finalPlaceId = String(place_id ?? placeId ?? "").trim()
-
-  if (!finalBusinessId) {
-    return Promise.reject(new Error("business_id is required"))
-  }
-
-  if (!finalPlaceId) {
-    return Promise.reject(new Error("place_id is required"))
-  }
-
-  const payload = {
-    business_id: finalBusinessId,
-    seaneb_id: String(seaneb_id || seanebId || "").trim(),
-    primary_number: String(primary_number || primaryNumber || "").trim(),
-    whatsapp_number: String(whatsapp_number || whatsappNumber || "").trim(),
-    business_email: String(business_email || businessEmail || "").trim(),
-    about_branch: String(about_branch || aboutBranch || "").trim(),
-    address: String(address || "").trim(),
-    landmark: String(landmark || "").trim(),
-    place_id: finalPlaceId,
-    pan: {
-      pan_number: String(pan || "").trim().toUpperCase(),
-    },
-    gst: {
-      gstin: String(gstin || "").trim().toUpperCase(),
-    },
-    product_key: getDefaultProductKey(),
-  }
-
-  const makeRequest = () =>
-    businessApi.post("/v1/business/create-branch", payload, {
-      headers: getAuthHeaders({ includeProductKey: true }),
-    })
-
-  return withBusinessRecovery(makeRequest)
-}
-
 /**
  * Verify PAN for a branch
- * POST /api/v1/verification/verify-pan
  */
 export const verifyPanForBranch = async ({ pan, branch_id }) => {
   if (!pan) {
@@ -636,11 +576,12 @@ export const verifyPanForBranch = async ({ pan, branch_id }) => {
   }
 
   try {
+    const normalizedPan = String(pan).trim().toUpperCase()
     const makeRequest = () =>
       businessApi.post(
         "/v1/verification/verify-pan",
         {
-          pan: String(pan).trim().toUpperCase(),
+          pan_number: normalizedPan,
           branch_id: String(branch_id),
           product_key: getDefaultProductKey(),
         },
@@ -684,108 +625,3 @@ export const verifyGstForBranch = async ({ gstin, branch_id }) => {
   }
 }
 
-/**
- * Get business details
- * GET /business/:id
- */
-export const getBusinessDetails = async (businessId) => {
-  if (!businessId) {
-    return Promise.reject(new Error("Business ID is required"))
-  }
-
-  console.log(`[business.service] Fetching business details for ID: ${businessId}`)
-  return api.get(`/business/${businessId}`)
-}
-
-/**
- * Update business information
- * PUT /business/:id
- */
-export const updateBusiness = async (businessId, data = {}) => {
-  if (!businessId) {
-    return Promise.reject(new Error("Business ID is required"))
-  }
-
-  const payload = {
-    business_name: data.business_name || data.businessName,
-    business_type: data.business_type || data.businessType,
-    business_description: data.business_description || data.businessDescription,
-    registration_number: data.registration_number || data.registrationNumber,
-  }
-
-  console.log(
-    `[business.service] Updating business ${businessId}:`,
-    JSON.stringify(payload, null, 2)
-  )
-  return api.put(`/business/${businessId}`, payload)
-}
-
-/**
- * Get user's business list
- * GET /v1/business/list
- */
-export const getBusinessList = async () => {
-  if (!BUSINESS_LIST_FETCH_ENABLED) {
-    return { data: { businesses: [] } };
-  }
-
-  const LIST_UNAVAILABLE_COOKIE = "business_list_unavailable";
-  const isUnavailable =
-    String(getCookie(LIST_UNAVAILABLE_COOKIE) || "").trim().toLowerCase() === "true";
-  if (isUnavailable) {
-    return { data: { businesses: [] } };
-  }
-
-  const endpoints = ["/v1/business/list", "/business/list"];
-  const keys = ["auto", "seaneb"];
-  let lastError = null;
-
-  for (const endpoint of endpoints) {
-    for (const key of keys) {
-      try {
-        const makeGet = () =>
-          businessApi.get(endpoint, {
-            params: { product_key: key },
-            headers: getAuthHeaders({ includeProductKey: true, productKey: key }),
-          });
-        return await withBusinessRecovery(makeGet);
-      } catch (err) {
-        lastError = err;
-      }
-
-      try {
-        const makePost = () =>
-          businessApi.post(
-            endpoint,
-            { product_key: key },
-            { headers: getAuthHeaders({ includeProductKey: true, productKey: key }) }
-          );
-        return await withBusinessRecovery(makePost);
-      } catch (err) {
-        lastError = err;
-      }
-    }
-  }
-
-  if (lastError) {
-    const status = Number(lastError?.response?.status || 0);
-    if (status === 404) {
-      setCookie(LIST_UNAVAILABLE_COOKIE, "true", { days: 1 });
-    }
-    console.warn("[business.service] business list unavailable:", parseErrorMessage(lastError, "Unavailable"));
-  }
-  return { data: { businesses: [] } };
-}
-
-/**
- * Delete a business
- * DELETE /business/:id
- */
-export const deleteBusiness = async (businessId) => {
-  if (!businessId) {
-    return Promise.reject(new Error("Business ID is required"))
-  }
-
-  console.log(`[business.service] Deleting business ${businessId}`)
-  return api.delete(`/business/${businessId}`)
-}

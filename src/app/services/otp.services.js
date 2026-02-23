@@ -1,10 +1,11 @@
 import api from "./api";
+import { PRODUCT_KEY } from "./productKey";
 import { getJsonCookie } from "./cookieStore";
 
 /* ================= MOBILE OTP ================= */
 
 export const sendOtp = (ctx) => {
-  const productKey = String(ctx?.product_key || "auto").trim();
+  const productKey = String(ctx?.product_key || PRODUCT_KEY).trim();
   return api.post(
     "/v1/otp/send-otp",
     {
@@ -29,7 +30,7 @@ export const verifyOtp = ({ otp }) => {
     throw new Error("OTP context missing. Please request OTP again.");
   }
 
-  const productKey = String(ctx?.product_key || "auto").trim();
+  const productKey = String(ctx?.product_key || PRODUCT_KEY).trim();
 
   return api.post(
     "/v1/otp/verify-otp",
@@ -53,7 +54,7 @@ export const sendEmailOtp = ({ email, purpose = 1 }) => {
     {
       email,
       purpose,
-      product_key: "auto",
+      product_key: PRODUCT_KEY,
     },
     { withCredentials: false }
   );
@@ -66,8 +67,9 @@ export const verifyEmailOtp = ({ email, otp, purpose = 1 }) => {
       email,
       otp,
       purpose,
-      product_key: "auto",
+      product_key: PRODUCT_KEY,
     },
     { withCredentials: false }
   );
 };
+

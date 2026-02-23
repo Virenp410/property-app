@@ -1,0 +1,73 @@
+import { NextResponse } from "next/server";
+
+const resolveProductKey = () => {
+  const key = String(process.env.NEXT_PUBLIC_PRODUCT_KEY || "auto").trim();
+  return key || "auto";
+};
+
+const isLoginRoute = (pathname) => pathname.startsWith("/auth/login");
+
+const isProtectedRoute = (pathname) =>
+  pathname.startsWith("/auth/success") ||
+  pathname.startsWith("/auth/userdash") ||
+  pathname.startsWith("/auth/dealerdash") ||
+  pathname.startsWith("/auth/business-reg");
+
+const getRequestedPathWithQuery = (url) => {
+  const pathname = String(url?.pathname || "").trim();
+  const search = String(url?.search || "").trim();
+  if (!pathname) return "";
+  return `${pathname}${search}`;
+};
+
+const getSafeInternalNextPath = (searchParams) => {
+  const next = String(searchParams?.get("next") || "").trim();
+  if (!next) return "";
+  if (!next.startsWith("/")) return "";
+  if (next.startsWith("//")) return "";
+  if (next.startsWith("/auth/login")) return "";
+  return next;
+};
+
+export function middleware(request) {
+  const { pathname, searchParams } = request.nextUrl;
+
+  const productKey = resolveProductKey();
+  const refreshToken =
+    request.cookies.get(`refresh_token_${productKey}`)?.value ||
+    request.cookies.get("refresh_token")?.value;
+  const csrfToken =
+    request.cookies.get(`csrf_token_${productKey}`)?.value ||
+    request.cookies.get("csrf_token")?.value;
+
+  const isAuthenticated = Boolean(refreshToken || csrfToken);
+
+  if (!isAuthenticated && isProtectedRoute(pathname)) {
+    const redirectUrl = new URL("/auth/login", request.url);
+    const lang = searchParams.get("lang");
+    const requestedPath = getRequestedPathWithQuery(request.nextUrl);
+    if (lang) {
+      redirectUrl.searchParams.set("lang", lang);
+    }
+    if (requestedPath) {
+      redirectUrl.searchParams.set("next", requestedPath);
+    }
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  if (!isAuthenticated || !isLoginRoute(pathname)) {
+    return NextResponse.next();
+  }
+
+  const nextPath = getSafeInternalNextPath(searchParams);
+  const redirectUrl = new URL(nextPath || "/auth/userdash", request.url);
+  const lang = searchParams.get("lang");
+  if (lang) {
+    redirectUrl.searchParams.set("lang", lang);
+  }
+  return NextResponse.redirect(redirectUrl);
+}
+
+export const config = {
+  matcher: ["/auth/:path*"],
+};

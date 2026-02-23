@@ -12,5 +12,17 @@
   "female": "Female",
   "hometownPlaceholder": "Type city",
   "terms": "I agree to the Terms & Conditions and Privacy Policy.",
-  "submit": "Submit"
+  "submit": "Submit",
+  "seanebIdVerifyLabel": "Verify",
+  "seanebIdCheckingLabel": "Checking...",
+  "seanebIdVerifiedLabel": "Verified",
+  "seanebIdEdit": "Edit SeaNeB ID",
+  "seanebIdLabel": "SeaNeB ID *",
+  "seanebIdPlaceholder": "username01",
+  "seanebIdFormatHelper": "6-30 characters. Lowercase letters, numbers, and hyphen (-) only.",
+  "seanebIdVerifyRequired": "Verify SeaNeB ID before submission.",
+  "seanebIdVerifiedMessage": "SeaNeB ID verified.",
+  "seanebIdExistsMessage": "SeaNeB ID already exists.",
+  "seanebIdInvalidMessage": "Invalid SeaNeB ID format.",
+  "seanebIdVerifyFailedMessage": "Unable to verify SeaNeB ID."
 }

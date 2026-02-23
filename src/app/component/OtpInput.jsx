@@ -54,23 +54,23 @@ export default function OtpInput({
     }
   };
 
- return (
-  <div className="otp-box">
-    {otp.map((digit, i) => (
-      <input
-        key={i}
-        ref={(el) => (inputsRef.current[i] = el)}
-        type="tel"
-        inputMode="numeric"
-        autoComplete="one-time-code"
-        pattern="\d*"
-        maxLength={1}
-        value={digit}
-        onChange={(e) => handleChange(e.target.value, i)}
-        onKeyDown={(e) => handleKeyDown(e, i)}
-        className="otp-input"
-      />
-    ))}
-  </div>
-);
+  return (
+    <div className="my-6 flex justify-center gap-[14px]">
+      {otp.map((digit, i) => (
+        <input
+          key={i}
+          ref={(el) => (inputsRef.current[i] = el)}
+          type="tel"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          pattern="\d*"
+          maxLength={1}
+          value={digit}
+          onChange={(e) => handleChange(e.target.value, i)}
+          onKeyDown={(e) => handleKeyDown(e, i)}
+          className="h-[52px] w-[52px] rounded-[12px] border border-[#dcdcdc] text-center text-[18px] [-webkit-text-security:disc] [text-security:disc] focus:border-[var(--auth-border-strong)] focus:outline-none"
+        />
+      ))}
+    </div>
+  );
 }

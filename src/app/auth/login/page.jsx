@@ -1,8 +1,8 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import countries from "@/app/constant/country.json";
 import AuthLayout from "@/app/component/AuthLayout";
@@ -12,15 +12,40 @@ import PrimaryButton from "@/app/component/PrimaryButton";
 import { sendOtp } from "@/app/services/otp.services";
 import { setJsonCookie } from "@/app/services/cookieStore";
 
-export default function Login() {
+const getSafeInternalNextPath = (value) => {
+  const next = String(value || "").trim();
+  if (!next) return "";
+  if (!next.startsWith("/")) return "";
+  if (next.startsWith("//")) return "";
+  if (next.startsWith("/auth/login")) return "";
+  return next;
+};
+
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [mobile, setMobile] = useState("");
   const [method, setMethod] = useState("whatsapp");
-  const [lang, setLang] = useState("en");
+  const [lang, setLang] = useState(() => {
+    const value = String(searchParams?.get("lang") || "en").trim().toLowerCase();
+    return value || "en";
+  });
   const [country, setCountry] = useState(countries[0]);
   const [showCountries, setShowCountries] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const safeNextPath = useMemo(
+    () => getSafeInternalNextPath(searchParams?.get("next")),
+    [searchParams]
+  );
+
+  useEffect(() => {
+    const value = String(searchParams?.get("lang") || "").trim().toLowerCase();
+    if (value && value !== lang) {
+      setLang(value);
+    }
+  }, [lang, searchParams]);
 
   const t = useTranslation(lang);
   const isValidMobile = mobile.length === 10;
@@ -37,6 +62,7 @@ export default function Login() {
       mobile_number: mobile,
       purpose: 0,
       via: method,
+      ...(safeNextPath ? { redirect_to: safeNextPath } : {}),
     };
 
     try {
@@ -69,23 +95,30 @@ export default function Login() {
 
   return (
     <AuthLayout lang={lang} onLangChange={setLang}>
-      <h2 className="login-title">{t.login}</h2>
-      <p className="login-subtitle">{t.subtitle}</p>
+      <h2 className="text-[24px] font-semibold text-[var(--color-black)]">{t.login}</h2>
+      <p className="mt-[6px] text-[14px] text-[var(--auth-subtle)]">{t.subtitle}</p>
 
-      <label className="form-label">{t.mobileLabel}</label>
+      <label className="mb-[6px] mt-[22px] block text-[14px] text-[var(--auth-label)]">
+        {t.mobileLabel}
+      </label>
 
-      <div className="phone-input">
+      <div className="relative flex items-center rounded-[10px] border border-[var(--auth-border)] bg-[var(--color-white)] p-[10px] focus-within:border-[var(--auth-border-strong)] focus-within:[box-shadow:0_0_0_1px_var(--auth-border-strong)]">
         <div
-          className="country-code"
+          className="flex cursor-pointer items-center gap-[6px] border-r border-r-[var(--auth-border)] pr-[18px]"
           onClick={() => setShowCountries(!showCountries)}
         >
-          <img src={country.flag} alt={country.name} />
+          <img
+            src={country.flag}
+            alt={country.name}
+            className="h-[14px] w-5 object-cover"
+          />
           <span>{country.dialCode}</span>
-          <span className="arrow">▾</span>
+          <span className="text-[12px] text-[#555555]">{"\u25BE"}</span>
         </div>
 
         <input
           type="tel"
+          className="w-full border-0 pl-[10px] text-[14px] outline-none"
           placeholder={t.placeholder}
           maxLength={10}
           value={mobile}
@@ -95,29 +128,31 @@ export default function Login() {
         />
 
         {showCountries && (
-          <div className="country-dropdown">
+          <div className="absolute left-0 top-[58px] z-50 max-h-[260px] w-full overflow-y-auto rounded-[12px] border border-[#dddddd] bg-[var(--color-white)] shadow-[0_10px_30px_rgba(0,0,0,0.12)]">
             {countries.map((c) => (
               <div
                 key={c.name}
-                className="country-item"
+                className="flex cursor-pointer items-center gap-[10px] border border-[var(--color-border-brand-soft)] bg-[var(--color-white)] px-3 py-[10px] text-[var(--color-brand-primary)] hover:bg-[var(--color-surface-muted)]"
                 onClick={() => {
                   setCountry(c);
                   setShowCountries(false);
                 }}
               >
-                <img src={c.flag} alt={c.name} />
-                <span className="country-name">{c.name}</span>
-                <span className="country-code-text">
-                  {c.dialCode}
-                </span>
+                <img
+                  src={c.flag}
+                  alt={c.name}
+                  className="h-4 w-[22px] object-cover"
+                />
+                <span className="flex-1 text-[14px]">{c.name}</span>
+                <span className="text-[13px] text-[#555555]">{c.dialCode}</span>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      <div className="otp-options">
-        <label>
+      <div className="mt-[18px] flex gap-5">
+        <label className="flex cursor-pointer items-center gap-[6px] text-[14px] text-[var(--auth-label)]">
           <input
             type="radio"
             checked={method === "sms"}
@@ -126,7 +161,7 @@ export default function Login() {
           {t.viaSms}
         </label>
 
-        <label>
+        <label className="flex cursor-pointer items-center gap-[6px] text-[14px] text-[var(--auth-label)]">
           <input
             type="radio"
             checked={method === "whatsapp"}
@@ -143,5 +178,13 @@ export default function Login() {
         {loading ? "Sending..." : t.continue}
       </PrimaryButton>
     </AuthLayout>
+  );
+}
+
+export default function Login() {
+  return (
+    <Suspense fallback={null}>
+      <LoginContent />
+    </Suspense>
   );
 }

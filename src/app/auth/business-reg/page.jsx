@@ -1,8 +1,10 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import countries from "@/app/constant/country.json";
 import AuthLayout from "@/app/component/AuthLayout";
 import AutoComplete from "@/app/component/AutoComplete";
 import PrimaryButton from "@/app/component/PrimaryButton";
@@ -11,9 +13,9 @@ import useDebounce from "@/app/hook/useDebaunce";
 import api from "@/app/services/api";
 import { sendEmailOtp, sendOtp, verifyEmailOtp } from "@/app/services/otp.services";
 import {
-  createBusiness,
   ensureDefaultProductAuto,
   getBusinessAutocomplete,
+  registerBusiness,
   verifyPanForBranch as verifyPan,
   verifyGstForBranch as verifyGstin,
 } from "@/app/services/business.services";
@@ -26,8 +28,10 @@ import {
   getJsonCookie,
   setJsonCookie,
 } from "@/app/services/cookieStore";
+import { PRODUCT_KEY } from "@/app/services/productKey";
 
 const EMPTY_FORM = {
+  country_code: "91",
   business_name: "",
   display_name: "",
   business_type: "",
@@ -52,21 +56,7 @@ const AUTO_BUSINESS_TYPE_OPTIONS = [
   { value: "3", label: "Multi-Brand Auto Hub" },
 ];
 
-const AUTO_MAIN_CATEGORY_FALLBACK = [
-  { id: "auto_used_cars", name: "Used Cars" },
-  { id: "auto_new_cars", name: "New Cars" },
-  { id: "auto_suv", name: "SUV & MUV" },
-  { id: "auto_hatchback", name: "Hatchback Cars" },
-  { id: "auto_sedan", name: "Sedan Cars" },
-  { id: "auto_luxury", name: "Luxury Cars" },
-  { id: "auto_electric", name: "Electric Vehicles" },
-  { id: "auto_commercial", name: "Commercial Vehicles" },
-  { id: "auto_parts", name: "Auto Parts & Accessories" },
-  { id: "auto_service", name: "Service & Maintenance" },
-];
-
 const MIN_BUSINESS_AUTOCOMPLETE_CHARS = 3;
-const PRODUCT_KEY = String(process.env.NEXT_PUBLIC_PRODUCT_KEY || "auto").trim() || "auto";
 const normalizeBusinessLabel = (value) =>
   String(value || "")
     .split(",")[0]
@@ -77,111 +67,38 @@ const getErrorMessage = (err, fallback) =>
   err?.response?.data?.message ||
   err?.message ||
   fallback;
-const getBusinessProfileStorageKey = (countryCode, mobileNumber) => {
-  const cc = String(countryCode || "").replace(/\D/g, "").trim();
-  const mobile = String(mobileNumber || "").replace(/\D/g, "").trim();
-  if (!cc || !mobile) return "";
-  return `business_profile_${cc}_${mobile}`;
+const normalizeCountryCode = (value) => String(value || "").replace("+", "").trim();
+const getCountryByCode = (code) => {
+  const normalized = normalizeCountryCode(code);
+  return (
+    countries.find((country) => normalizeCountryCode(country?.dialCode) === normalized) ||
+    countries[0]
+  );
 };
 
-const getStoredBusinessProfile = (storageKey) => {
-  if (!storageKey) return null;
-  const fromCookie = getJsonCookie(storageKey);
-  if (fromCookie?.registered) return fromCookie;
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(storageKey);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return parsed?.registered ? parsed : null;
-  } catch {
-    return null;
-  }
-};
-
-const persistBusinessProfile = (storageKey, profile) => {
-  if (!storageKey || !profile) return;
-  setJsonCookie(storageKey, profile, { days: 365 });
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(storageKey, JSON.stringify(profile));
-  } catch {
-    // ignore
-  }
-};
-
-const getBusinessOwnerMobileKey = (countryCode, mobileNumber) => {
-  const cc = String(countryCode || "").replace(/\D/g, "").trim();
-  const mobile = String(mobileNumber || "").replace(/\D/g, "").trim();
-  if (!cc || !mobile) return "";
-  return `${cc}-${mobile}`;
-};
-
-const normalizeOwnerMobileKey = (value) =>
-  String(value || "").replace(/\D/g, "").trim();
-
-const parseJwtPayload = (token) => {
-  try {
-    const parts = String(token || "").split(".");
-    if (parts.length < 2) return {};
-    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    const json = atob(base64);
-    return JSON.parse(json || "{}");
-  } catch {
-    return {};
-  }
-};
-
-const extractBusinessIdentityFromClaims = (claims) => {
-  const businessId = String(
-    claims?.business_id ??
-      claims?.businessId ??
-      claims?.bid ??
-      claims?.biz_id ??
-      ""
-  ).trim();
-  const branchId = String(
-    claims?.branch_id ??
-      claims?.branchId ??
-      claims?.default_branch_id ??
-      ""
-  ).trim();
-  const businessName = String(
-    claims?.business_name ??
-      claims?.businessName ??
-      claims?.biz_name ??
-      ""
-  ).trim();
-  const registered =
-    claims?.business_registered === true ||
-    claims?.registered_business === true ||
-    claims?.is_business_user === true ||
-    Boolean(businessId) ||
-    Boolean(branchId);
-  return { businessId, branchId, businessName, registered };
-};
-
-const extractOwnerMobileKeyFromClaims = (claims) => {
-  const cc = String(
-    claims?.country_code ??
-      claims?.countryCode ??
-      claims?.cc ??
-      ""
-  )
-    .replace(/\D/g, "")
-    .trim();
-  const mobile = String(
-    claims?.mobile_number ??
-      claims?.mobile ??
-      claims?.phone ??
-      claims?.phone_number ??
-      ""
-  )
-    .replace(/\D/g, "")
-    .trim();
-  if (!cc || !mobile) return "";
-  return `${cc}-${mobile}`;
-};
+const BIZ_INPUT_CLASS =
+  "h-[46px] w-full rounded-[11px] border border-[#d9e1ec] bg-[var(--color-white)] px-[14px] text-[14px] text-[var(--color-text-primary)] placeholder:text-[#94a3b8] transition-[border-color,box-shadow,transform] duration-200 ease-in-out focus:border-[#0f4ec9] focus:outline-none focus:[box-shadow:0_0_0_4px_rgba(15,78,201,0.18)]";
+const BIZ_TEXTAREA_CLASS =
+  "h-auto min-h-[112px] w-full resize-y rounded-[11px] border border-[#d9e1ec] bg-[var(--color-white)] px-[14px] py-[11px] text-[14px] leading-[1.5] text-[var(--color-text-primary)] placeholder:text-[#94a3b8] transition-[border-color,box-shadow,transform] duration-200 ease-in-out focus:border-[#0f4ec9] focus:outline-none focus:[box-shadow:0_0_0_4px_rgba(15,78,201,0.18)]";
+const BIZ_AUTOCOMPLETE_WRAPPER_CLASS = "relative";
+const BIZ_SUGGESTION_BOX_CLASS =
+  "absolute left-0 top-full z-[60] max-h-[200px] w-full overflow-y-auto rounded-b-[10px] border border-t-0 border-[#d9e1ec] bg-[var(--color-white)] shadow-[0_14px_28px_rgba(15,23,42,0.12)]";
+const BIZ_SUGGESTION_ITEM_CLASS =
+  "cursor-pointer px-[14px] py-[10px] text-[14px] text-[var(--color-text-heading)] hover:bg-[var(--color-surface-muted)]";
+const BIZ_VERIFY_WRAPPER_CLASS = "relative w-full";
+const BIZ_VERIFY_BUTTON_BASE_CLASS =
+  "absolute right-[10px] top-1/2 h-8 -translate-y-1/2 whitespace-nowrap rounded-[6px] border border-[var(--auth-border-light)] bg-[var(--color-white)] px-3 text-[12px] text-[var(--color-black)] transition-colors duration-200 ease-in-out hover:bg-[var(--color-surface-muted)] disabled:cursor-not-allowed disabled:opacity-60";
+const BIZ_VERIFY_BUTTON_VERIFIED_CLASS =
+  "absolute right-[10px] top-1/2 h-8 -translate-y-1/2 cursor-default whitespace-nowrap rounded-[6px] border border-[var(--color-success)] bg-[var(--color-success)] px-3 text-[12px] text-[var(--color-white)]";
+const BIZ_VERIFY_OTP_ROW_CLASS =
+  "mt-[10px] grid grid-cols-[1fr_120px] gap-2 [@media(max-width:640px)]:grid-cols-1";
+const BIZ_VERIFY_OTP_BUTTON_CLASS =
+  "h-[44px] cursor-pointer rounded-[10px] border border-[#0f4ec9] bg-[var(--color-btn-secondary-hover)] text-[13px] font-semibold text-[#0f4ec9] disabled:cursor-not-allowed disabled:opacity-60";
+const BIZ_HELPER_CLASS = "mt-[7px] text-[12px] text-[var(--color-text-muted)]";
+const BIZ_HELPER_ERROR_CLASS =
+  "mt-[7px] text-[12px] font-medium text-[var(--color-danger)]";
+const BIZ_HELPER_SUCCESS_CLASS =
+  "mt-[7px] text-[12px] text-[var(--color-success-strong)]";
 
 export default function BusinessRegistrationPage() {
   const router = useRouter();
@@ -209,13 +126,19 @@ export default function BusinessRegistrationPage() {
   const [verifyingGst, setVerifyingGst] = useState(false);
   const [checkingSeanebId, setCheckingSeanebId] = useState(false);
   const [seanebVerified, setSeanebVerified] = useState(false);
+  const [editingSeanebId, setEditingSeanebId] = useState(true);
+  const [seanebIdMessage, setSeanebIdMessage] = useState("");
+  const [seanebIdMessageType, setSeanebIdMessageType] = useState("");
   const [categories, setCategories] = useState([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [branchId, setBranchId] = useState("");
   const [sessionExpired, setSessionExpired] = useState(false);
   const [businessCheckDone, setBusinessCheckDone] = useState(false);
+  const [country, setCountry] = useState(() => getCountryByCode("91"));
+  const [showCountries, setShowCountries] = useState(false);
   const submitLockRef = useRef(false);
   const businessAutocompleteRef = useRef(null);
+  const countryDropdownRef = useRef(null);
   const debouncedBusinessName = useDebounce(form.business_name, 350);
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -302,6 +225,9 @@ export default function BusinessRegistrationPage() {
 
     if (key === "seaneb_id") {
       setSeanebVerified(false);
+      setEditingSeanebId(true);
+      setSeanebIdMessage("");
+      setSeanebIdMessageType("");
     }
 
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -312,15 +238,29 @@ export default function BusinessRegistrationPage() {
 
     try {
       const parsed = getJsonCookie("business_reg_draft");
-      if (!parsed || typeof parsed !== "object") return;
-      setForm((prev) => ({
-        ...prev,
-        ...parsed,
-        place:
-          parsed?.place && typeof parsed.place === "object"
-            ? parsed.place
-            : prev.place,
-      }));
+      if (parsed && typeof parsed === "object") {
+        setForm((prev) => ({
+          ...prev,
+          ...parsed,
+          country_code:
+            normalizeCountryCode(parsed?.country_code) || prev.country_code,
+          place:
+            parsed?.place && typeof parsed.place === "object"
+              ? parsed.place
+              : prev.place,
+        }));
+
+        const draftCountry = getCountryByCode(parsed?.country_code);
+        setCountry(draftCountry);
+        return;
+      }
+
+      const verifiedMobile = getJsonCookie("verified_mobile");
+      const verifiedCountryCode = normalizeCountryCode(verifiedMobile?.country_code);
+      if (verifiedCountryCode) {
+        setCountry(getCountryByCode(verifiedCountryCode));
+        setForm((prev) => ({ ...prev, country_code: verifiedCountryCode }));
+      }
     } catch {
       // ignore malformed draft
     }
@@ -339,6 +279,8 @@ export default function BusinessRegistrationPage() {
       const verified = getJsonCookie("verified_mobile");
       const verifiedNumber = String(verified?.mobile_number || "").trim();
       const verifiedPurpose = Number(verified?.purpose ?? 0);
+      const verifiedCountryCode = normalizeCountryCode(verified?.country_code);
+      const selectedCountryCode = normalizeCountryCode(form.country_code);
       const businessMobileVerified =
         getCookie("business_mobile_verified") === "true";
       setMobileVerified(
@@ -346,13 +288,14 @@ export default function BusinessRegistrationPage() {
           verifiedNumber &&
             verifiedNumber === mobile &&
             verifiedPurpose === 2 &&
+            (!selectedCountryCode || verifiedCountryCode === selectedCountryCode) &&
             businessMobileVerified
         )
       );
     } catch {
       setMobileVerified(false);
     }
-  }, [form.primary_number]);
+  }, [form.primary_number, form.country_code]);
 
   const handlePlaceChange = (value) => {
     if (typeof value === "string") {
@@ -365,6 +308,15 @@ export default function BusinessRegistrationPage() {
     setForm((prev) => ({ ...prev, place: value }));
   };
 
+  const handleCountrySelect = (selectedCountry) => {
+    const selectedCode = normalizeCountryCode(selectedCountry?.dialCode);
+    setCountry(selectedCountry || countries[0]);
+    setShowCountries(false);
+    setForm((prev) => ({ ...prev, country_code: selectedCode || prev.country_code }));
+    setMobileVerified(false);
+    removeCookie("business_mobile_verified");
+  };
+
   useEffect(() => {
     let active = true;
 
@@ -372,138 +324,24 @@ export default function BusinessRegistrationPage() {
       try {
         if (!active) return;
 
-        const verified = getJsonCookie("verified_mobile");
-        const fromVerified = getBusinessOwnerMobileKey(
-          verified?.country_code,
-          verified?.mobile_number
-        );
-        const accessToken = String(
-          getCookie("access_token_auto") || getCookie("access_token") || ""
-        ).trim();
-        const claims = parseJwtPayload(accessToken);
-        const currentMobileOwnerKey =
-          fromVerified || extractOwnerMobileKeyFromClaims(claims);
-        const existingOwnerKey = String(getCookie("business_owner_mobile") || "").trim();
-        const normalizedCurrent = normalizeOwnerMobileKey(currentMobileOwnerKey);
-        const normalizedExisting = normalizeOwnerMobileKey(existingOwnerKey);
-        const ownerMatches =
-          Boolean(normalizedCurrent) &&
-          (!normalizedExisting || normalizedExisting === normalizedCurrent);
+        const profileRes = await api.get("/v1/profile/me", {
+          params: {
+            _t: Date.now(),
+          },
+          headers: { "x-product-key": PRODUCT_KEY },
+        });
+        const profilePayload = profileRes?.data || {};
+        const profileData =
+          profilePayload?.data && typeof profilePayload.data === "object"
+            ? profilePayload.data
+            : profilePayload;
+        const profileRegistered =
+          profileData?.is_business_registered === true ||
+          profileData?.isBusinessRegistered === true;
 
-        const isBusinessRegistered =
-          getCookie("business_register") === "true" ||
-          getCookie("business_registered") === "true";
-        const hasBusinessName = Boolean(String(getCookie("business_name") || "").trim());
-        const hasBusinessId = Boolean(String(getCookie("business_id") || "").trim());
-        const hasBranchId = Boolean(String(getCookie("branch_id") || "").trim());
-        const hasBusinessForMobile =
-          String(getCookie("has_business_for_mobile") || "").trim().toLowerCase() ===
-          "true";
-
-        const tokenBusiness = extractBusinessIdentityFromClaims(
-          claims
-        );
-
-        // Prefer backend profile status from /api/v1/profile/me
-        try {
-          const profileRes = await api.get("/v1/profile/me", {
-            headers: { "x-product-key": PRODUCT_KEY },
-          });
-          const profilePayload = profileRes?.data || {};
-          const profileData =
-            profilePayload?.data && typeof profilePayload.data === "object"
-              ? profilePayload.data
-              : profilePayload;
-          const profileRegistered =
-            profileData?.is_business_registered === true ||
-            profileData?.isBusinessRegistered === true;
-
-          if (profileRegistered) {
-            setCookie("business_registered", "true", { days: 365 });
-            setCookie("business_register", "true", { days: 365 });
-            setCookie("has_business_for_mobile", "true", { days: 365 });
-            setCookie("dashboard_mode", "dealer", { days: 365 });
-            if (currentMobileOwnerKey) {
-              setCookie("business_owner_mobile", currentMobileOwnerKey, { days: 365 });
-            }
-            router.replace("/auth/dealerdash");
-            return;
-          }
-        } catch (profileErr) {
-          const profileStatus = Number(profileErr?.response?.status || 0);
-          if (profileStatus === 401) {
-            throw profileErr;
-          }
-          // Non-auth profile fetch issues should not block fallback checks below.
-        }
-
-        if (
-          ownerMatches &&
-          (isBusinessRegistered ||
-            hasBusinessName ||
-            hasBusinessId ||
-            hasBranchId ||
-            hasBusinessForMobile)
-        ) {
-          setCookie("business_registered", "true", { days: 365 });
-          setCookie("business_register", "true", { days: 365 });
-          setCookie("has_business_for_mobile", "true", { days: 365 });
+        if (profileRegistered) {
           setCookie("dashboard_mode", "dealer", { days: 365 });
-          if (currentMobileOwnerKey) {
-            setCookie("business_owner_mobile", currentMobileOwnerKey, { days: 365 });
-          }
           router.replace("/auth/dealerdash");
-          return;
-        }
-
-        if (tokenBusiness.registered) {
-          setCookie("business_registered", "true", { days: 365 });
-          setCookie("business_register", "true", { days: 365 });
-          setCookie("has_business_for_mobile", "true", { days: 365 });
-          setCookie("dashboard_mode", "dealer", { days: 365 });
-          if (tokenBusiness.businessId) {
-            setCookie("business_id", tokenBusiness.businessId, { days: 365 });
-          }
-          if (tokenBusiness.branchId) {
-            setCookie("branch_id", tokenBusiness.branchId, { days: 365 });
-          }
-          if (tokenBusiness.businessName) {
-            setCookie("business_name", tokenBusiness.businessName, { days: 365 });
-          }
-          if (currentMobileOwnerKey) {
-            setCookie("business_owner_mobile", currentMobileOwnerKey, { days: 365 });
-          }
-          router.replace("/auth/dealerdash");
-          return;
-        }
-
-        const key = getBusinessProfileStorageKey(
-          verified?.country_code,
-          verified?.mobile_number
-        );
-
-        if (key) {
-          const profile = getStoredBusinessProfile(key);
-          if (profile?.registered) {
-            setCookie("business_registered", "true", { days: 365 });
-            setCookie("business_register", "true", { days: 365 });
-            setCookie("has_business_for_mobile", "true", { days: 365 });
-            setCookie("dashboard_mode", "dealer", { days: 365 });
-            if (profile.business_id) {
-              setCookie("business_id", String(profile.business_id), { days: 365 });
-            }
-            if (profile.branch_id) {
-              setCookie("branch_id", String(profile.branch_id), { days: 365 });
-            }
-            if (profile.business_name) {
-              setCookie("business_name", String(profile.business_name), { days: 365 });
-            }
-            if (currentMobileOwnerKey) {
-              setCookie("business_owner_mobile", currentMobileOwnerKey, { days: 365 });
-            }
-            router.replace("/auth/dealerdash");
-            return;
-          }
         }
       } catch (err) {
         if (Number(err?.response?.status || 0) === 401) {
@@ -599,6 +437,13 @@ export default function BusinessRegistrationPage() {
       ) {
         setShowBusinessSuggestions(false);
       }
+
+      if (
+        countryDropdownRef.current &&
+        !countryDropdownRef.current.contains(event.target)
+      ) {
+        setShowCountries(false);
+      }
     };
 
     document.addEventListener("mousedown", closeOnOutside);
@@ -683,38 +528,31 @@ export default function BusinessRegistrationPage() {
     if (!isValidPrimaryNumber || sendingMobileOtp || mobileVerified) return;
 
     const mobile = form.primary_number.trim();
-    let countryCode = "";
+    let countryCode = normalizeCountryCode(form.country_code || country?.dialCode);
 
-    try {
-      const verifiedMobile =
-        typeof window !== "undefined" ? getJsonCookie("verified_mobile") : null;
-      countryCode = String(verifiedMobile?.country_code || "").trim();
-    } catch {
-      countryCode = "";
-    }
-
-    if (!countryCode && typeof window !== "undefined") {
+    if (!countryCode) {
       try {
-        const otpContext = getJsonCookie("otp_context");
-        countryCode = String(otpContext?.country_code || "").trim();
+        const verifiedMobile =
+          typeof window !== "undefined" ? getJsonCookie("verified_mobile") : null;
+        countryCode = normalizeCountryCode(verifiedMobile?.country_code);
       } catch {
         countryCode = "";
       }
     }
 
     if (!countryCode) {
-      setErrorMessage("Country code missing. Please login again.");
+      setErrorMessage("Please select a country code.");
       return;
     }
 
     const otpContext = {
       type: "mobile",
       identifier_type: 0,
-      country_code: countryCode.replace("+", ""),
+      country_code: countryCode,
       mobile_number: mobile,
       purpose: 2,
       via: "whatsapp",
-      product_key: "auto",
+      product_key: PRODUCT_KEY,
       redirect_to: "/auth/business-reg",
     };
 
@@ -750,7 +588,7 @@ export default function BusinessRegistrationPage() {
       setErrorMessage("");
     } catch (err) {
       setPanVerified(false);
-      setErrorMessage(err?.response?.data?.message || t.panVerifyFailed);
+      setErrorMessage(getErrorMessage(err, t.panVerifyFailed));
     } finally {
       setVerifyingPan(false);
     }
@@ -773,33 +611,47 @@ export default function BusinessRegistrationPage() {
       setErrorMessage("");
     } catch (err) {
       setGstVerified(false);
-      setErrorMessage(err?.response?.data?.message || t.gstinVerifyFailed);
+      setErrorMessage(getErrorMessage(err, t.gstinVerifyFailed));
     } finally {
       setVerifyingGst(false);
     }
   };
 
   const handleVerifySeanebId = async () => {
-    if (!isValidSeaneb || checkingSeanebId) return;
+    if (!isValidSeaneb || checkingSeanebId || (seanebVerified && !editingSeanebId)) return;
 
     try {
       setCheckingSeanebId(true);
+      setSeanebIdMessage("");
+      setSeanebIdMessageType("");
       await checkSeanebId(form.seaneb_id.trim().toLowerCase());
       setSeanebVerified(true);
+      setEditingSeanebId(false);
+      setSeanebIdMessage(t.seanebIdVerifiedMessage || "SeaNeB ID verified.");
+      setSeanebIdMessageType("success");
       setErrorMessage("");
     } catch (err) {
       setSeanebVerified(false);
+      setEditingSeanebId(true);
       const status = Number(err?.response?.status || 0);
+      setSeanebIdMessageType("error");
       if (status === 409) {
-        setErrorMessage("SeaNeB ID already exists.");
+        setSeanebIdMessage(t.seanebIdExistsMessage || "SeaNeB ID already exists.");
       } else if (status === 400) {
-        setErrorMessage("Invalid SeaNeB ID format.");
+        setSeanebIdMessage(t.seanebIdInvalidMessage || "Invalid SeaNeB ID format.");
       } else {
-        setErrorMessage("Unable to verify SeaNeB ID.");
+        setSeanebIdMessage(t.seanebIdVerifyFailedMessage || "Unable to verify SeaNeB ID.");
       }
     } finally {
       setCheckingSeanebId(false);
     }
+  };
+
+  const handleEditSeanebId = () => {
+    setSeanebVerified(false);
+    setEditingSeanebId(true);
+    setSeanebIdMessage("");
+    setSeanebIdMessageType("");
   };
 
   const handleSubmit = async () => {
@@ -819,6 +671,7 @@ export default function BusinessRegistrationPage() {
       business_name: normalizedBusinessName,
       display_name: normalizedDisplayName,
       business_type: Number(form.business_type),
+      country_code: normalizeCountryCode(form.country_code),
       seaneb_id: form.seaneb_id.trim(),
       primary_number: form.primary_number.trim(),
       whatsapp_number:
@@ -843,54 +696,15 @@ export default function BusinessRegistrationPage() {
     }
 
     try {
-      const response = await createBusiness(payload);
+      const response = await registerBusiness(payload);
       const data = response?.data || {};
       const branch = String(data?.branch_id || data?.default_branch_id || "");
-      const businessId = String(data?.business_id || data?.id || "");
-      const registeredName = normalizedBusinessName || form.business_name.trim();
       if (branch) setBranchId(branch);
 
       setSuccessMessage(t.businessRegisterSuccess);
       removeCookie("business_reg_draft");
-      // Set all business cookies for robust detection (matches working app)
-      setCookie("business_registered", "true", { days: 365 });
-      setCookie("business_register", "true", { days: 365 });
-      setCookie("has_business_for_mobile", "true", { days: 365 });
       setCookie("dashboard_mode", "dealer", { days: 365 });
       setCookie("profile_completed", "true", { days: 365 });
-      if (businessId) setCookie("business_id", businessId, { days: 365 });
-      if (branch) setCookie("branch_id", branch, { days: 365 });
-      if (registeredName) setCookie("business_name", registeredName, { days: 365 });
-      const verifiedMobile = getJsonCookie("verified_mobile");
-      const mobileOwnerKey = getBusinessOwnerMobileKey(
-        verifiedMobile?.country_code,
-        verifiedMobile?.mobile_number
-      );
-      if (mobileOwnerKey && mobileOwnerKey !== "-") {
-        setCookie("business_owner_mobile", mobileOwnerKey, { days: 365 });
-      }
-      if (emailVerified) {
-        setCookie("business_email_verified", "true", { days: 365 });
-        setCookie("verified_business_email", form.business_email.trim(), { days: 365 });
-      }
-
-      try {
-        const verified = getJsonCookie("verified_mobile");
-        const storageKey = getBusinessProfileStorageKey(
-          verified?.country_code,
-          verified?.mobile_number
-        );
-        if (storageKey) {
-          persistBusinessProfile(storageKey, {
-            registered: true,
-            business_id: businessId || "",
-            branch_id: branch || "",
-            business_name: registeredName || "",
-          });
-        }
-      } catch {
-        // ignore local storage errors
-      }
 
       router.replace("/auth/dealerdash");
     } catch (err) {
@@ -911,51 +725,114 @@ export default function BusinessRegistrationPage() {
       showBack={true}
       backFallback="/auth/userdash"
     >
-      <div className="bizreg-form bizreg-form-pro">
-        <div className="business-register-top">
-          <div className="business-register-header">
-            <h2 className="reg-title">{t.businessRegTitle}</h2>
-            <p className="reg-subtitle">{t.businessRegSubtitle}</p>
+      <div>
+        <div className="mb-3.5">
+          <div className="mb-2.5">
+            <h2 className="mb-1.5 mt-0.5 text-[40px] font-semibold leading-[1.1] tracking-[-0.02em] text-(--color-text-primary) [@media(max-width:900px)]:text-[30px] [@media(max-width:640px)]:text-[32px]">
+              {t.businessRegTitle}
+            </h2>
+            <p className="mb-4.5 mt-2 max-w-[64ch] text-[15px] leading-normal text-(--color-text-muted) [@media(max-width:900px)]:mb-3.5 [@media(max-width:900px)]:text-[14px]">
+              {t.businessRegSubtitle}
+            </p>
           </div>
 
-          <div className="business-register-progress">
-            <div className="business-register-progress-meta">
+          <div className="mb-3.5 mt-2">
+            <div className="mb-1.5 flex items-center justify-between text-[13px] text-(--color-text-muted-strong)">
               <span>Form completion</span>
-              <strong>{completionPercent}%</strong>
+              <strong className="text-(--color-text-primary)">{completionPercent}%</strong>
             </div>
-            <div className="business-register-progress-track">
-              <span style={{ width: `${completionPercent}%` }} />
+            <div className="h-2 overflow-hidden rounded-full bg-(--color-border-soft)">
+              <span
+                className="block h-full rounded-full bg-[linear-gradient(90deg,var(--color-btn-primary-bg)_0%,var(--color-btn-primary-hover)_100%)]"
+                style={{ width: `${completionPercent}%` }}
+              />
             </div>
           </div>
 
-          <div className="business-status-grid">
-            <div className={`business-status-pill ${mobileVerified ? "verified" : ""}`}>
-              <span>Mobile</span>
-              <strong>{mobileVerified ? "Verified" : "Pending"}</strong>
+          <div className="mb-1.5 grid grid-cols-4 gap-2.5 [@media(max-width:900px)]:grid-cols-2">
+            <div
+              className={`flex flex-col gap-[3px] rounded-[12px] border px-3 py-[10px] ${
+                mobileVerified
+                  ? "border-[var(--color-bizpro-pill-verified-border)] bg-[var(--color-bizpro-pill-verified-bg)]"
+                  : "border-[var(--color-border-bizpro)] bg-[var(--color-surface-section)]"
+              }`}
+            >
+              <span className="text-[12px] text-[var(--color-text-muted)]">Mobile</span>
+              <strong
+                className={`text-[13px] ${
+                  mobileVerified
+                    ? "text-[var(--color-bizpro-pill-verified-text)]"
+                    : "text-[var(--color-text-primary)]"
+                }`}
+              >
+                {mobileVerified ? "Verified" : "Pending"}
+              </strong>
             </div>
-            <div className={`business-status-pill ${emailVerified ? "verified" : ""}`}>
-              <span>Email</span>
-              <strong>{emailVerified ? "Verified" : "Pending"}</strong>
+            <div
+              className={`flex flex-col gap-0.75 rounded-xl border px-3 py-2.5 ${
+                emailVerified
+                  ? "border-(--color-bizpro-pill-verified-border) bg-(--color-bizpro-pill-verified-bg)"
+                  : "border-(--color-border-bizpro) bg-(--color-surface-section)"
+              }`}
+            >
+              <span className="text-[12px] text-(--color-text-muted)">Email</span>
+              <strong
+                className={`text-[13px] ${
+                  emailVerified
+                    ? "text-(--color-bizpro-pill-verified-text)"
+                    : "text-(--color-text-primary)"
+                }`}
+              >
+                {emailVerified ? "Verified" : "Pending"}
+              </strong>
             </div>
-            <div className={`business-status-pill ${form.place.place_id ? "verified" : ""}`}>
-              <span>Location</span>
-              <strong>{form.place.place_id ? "Selected" : "Pending"}</strong>
+            <div
+              className={`flex flex-col gap-0.75 rounded-xl border px-3 py-2.5 ${
+                form.place.place_id
+                  ? "border-(--color-bizpro-pill-verified-border) bg-(--color-bizpro-pill-verified-bg)"
+                  : "border-(--color-border-bizpro) bg-(--color-surface-section)"
+              }`}
+            >
+              <span className="text-[12px] text-(--color-text-muted)">Location</span>
+              <strong
+                className={`text-[13px] ${
+                  form.place.place_id
+                    ? "text-(--color-bizpro-pill-verified-text)"
+                    : "text-(--color-text-primary)"
+                }`}
+              >
+                {form.place.place_id ? "Selected" : "Pending"}
+              </strong>
             </div>
-            <div className={`business-status-pill ${branchId ? "verified" : ""}`}>
-              <span>Branch</span>
-              <strong>{branchId ? "Created" : "New"}</strong>
+            <div
+              className={`flex flex-col gap-0.75 rounded-xl border px-3 py-2.5 ${
+                branchId
+                  ? "border-(--color-bizpro-pill-verified-border) bg-(--color-bizpro-pill-verified-bg)"
+                  : "border-(--color-border-bizpro) bg-(--color-surface-section)"
+              }`}
+            >
+              <span className="text-[12px] text-(--color-text-muted)">Branch</span>
+              <strong
+                className={`text-[13px] ${
+                  branchId
+                    ? "text-(--color-bizpro-pill-verified-text)"
+                    : "text-(--color-text-primary)"
+                }`}
+              >
+                {branchId ? "Created" : "New"}
+              </strong>
             </div>
           </div>
         </div>
 
         {errorMessage && (
-          <p className="field-helper error" style={{ marginBottom: 12 }}>
+          <p className={BIZ_HELPER_ERROR_CLASS} style={{ marginBottom: 12 }}>
             {errorMessage}
           </p>
         )}
 
         {successMessage && (
-          <p className="field-helper" style={{ marginBottom: 12, color: "#16a34a" }}>
+          <p className={BIZ_HELPER_SUCCESS_CLASS} style={{ marginBottom: 12 }}>
             {successMessage}
           </p>
         )}
@@ -965,19 +842,21 @@ export default function BusinessRegistrationPage() {
             e.preventDefault();
             handleSubmit();
           }}
-          className="business-form business-form--pro"
+          className="grid gap-3.5"
         >
-          <section className="business-section-card">
-            <div className="business-section-head">
-              <h3>{t.businessInfoSection}</h3>
-              <p>Core identity details visible to your customers.</p>
+          <section className="rounded-2xl border border-(--color-border-bizpro) bg-[linear-gradient(180deg,var(--color-white)_0%,var(--color-surface-section)_100%)] p-4.5 shadow-[0_10px_22px_rgba(15,23,42,0.05)]">
+            <div>
+              <h3 className="m-0 text-[16px] text-(--color-text-primary)">{t.businessInfoSection}</h3>
+              <p className="mb-0 mt-1.25 text-[13px] text-(--color-text-muted)">
+                Core identity details visible to your customers.
+              </p>
             </div>
 
-            <div className="business-grid business-grid--2">
+            <div className="mt-3.5 grid grid-cols-2 gap-3.5 [@media(max-width:640px)]:grid-cols-1">
               <Field label={t.businessName}>
-                <div className="autocomplete" ref={businessAutocompleteRef}>
+                <div className={BIZ_AUTOCOMPLETE_WRAPPER_CLASS} ref={businessAutocompleteRef}>
                   <input
-                    className="reg-input"
+                    className={BIZ_INPUT_CLASS}
                     value={form.business_name}
                     onChange={(e) => {
                       handleChange("business_name", e.target.value);
@@ -989,13 +868,13 @@ export default function BusinessRegistrationPage() {
                   />
 
                   {showBusinessSuggestions && (
-                    <div className="suggestion-box">
+                    <div className={BIZ_SUGGESTION_BOX_CLASS}>
                       {businessLoading && (
-                        <div className="suggestion-item">{t.loadingSuggestions}</div>
+                        <div className={BIZ_SUGGESTION_ITEM_CLASS}>{t.loadingSuggestions}</div>
                       )}
 
                       {!businessLoading && businessSuggestionError && (
-                        <div className="suggestion-item">{businessSuggestionError}</div>
+                        <div className={BIZ_SUGGESTION_ITEM_CLASS}>{businessSuggestionError}</div>
                       )}
 
                       {!businessLoading &&
@@ -1003,7 +882,7 @@ export default function BusinessRegistrationPage() {
                         businessFetchedOnce &&
                         businessSuggestions.length === 0 &&
                         form.business_name.trim().length >= MIN_BUSINESS_AUTOCOMPLETE_CHARS && (
-                          <div className="suggestion-item">{t.noBusinessSuggestions}</div>
+                          <div className={BIZ_SUGGESTION_ITEM_CLASS}>{t.noBusinessSuggestions}</div>
                         )}
 
                       {!businessLoading &&
@@ -1017,7 +896,7 @@ export default function BusinessRegistrationPage() {
                           return (
                             <div
                               key={`${business.place_id || "biz"}-${idx}`}
-                              className="suggestion-item"
+                              className={BIZ_SUGGESTION_ITEM_CLASS}
                               onMouseDown={() => {
                                 handleChange("business_name", businessLabel);
                                 if (!form.display_name.trim()) {
@@ -1037,7 +916,7 @@ export default function BusinessRegistrationPage() {
 
               <Field label={t.displayName}>
                 <input
-                  className="reg-input"
+                  className={BIZ_INPUT_CLASS}
                   value={form.display_name}
                   onChange={(e) => handleChange("display_name", e.target.value)}
                   placeholder={t.displayNamePlaceholder}
@@ -1046,7 +925,7 @@ export default function BusinessRegistrationPage() {
 
               <Field label="Business Type *">
                 <select
-                  className="reg-input"
+                  className={BIZ_INPUT_CLASS}
                   value={form.business_type}
                   onChange={(e) => handleChange("business_type", e.target.value)}
                 >
@@ -1061,16 +940,15 @@ export default function BusinessRegistrationPage() {
 
               <Field label="Main Category *">
                 <select
-                  className="reg-input"
+                  className={BIZ_INPUT_CLASS}
                   value={form.main_category_id}
-                  disabled={categoriesLoading}
+                  disabled={categoriesLoading || categories.length === 0}
                   onChange={(e) => handleChange("main_category_id", e.target.value)}
                 >
                   <option value="">
                     {categoriesLoading ? "Loading categories..." : "Select a category"}
                   </option>
-                  {(categories.length ? categories : AUTO_MAIN_CATEGORY_FALLBACK).map(
-                    (category) => {
+                  {categories.map((category) => {
                     const catId = category.main_category_id || category.id || "";
                     const catName = category.main_category_name || category.name || "Unnamed";
                     return (
@@ -1078,54 +956,150 @@ export default function BusinessRegistrationPage() {
                         {catName}
                       </option>
                     );
-                    }
-                  )}
+                  })}
                 </select>
+                {!categoriesLoading && categories.length === 0 && (
+                  <p className={BIZ_HELPER_ERROR_CLASS}>
+                    Categories not available right now. Please try again in a moment.
+                  </p>
+                )}
               </Field>
 
               <Field label={t.seanebBranchId}>
-                <div className="verify-input-wrapper">
+                <div className={BIZ_VERIFY_WRAPPER_CLASS}>
                   <input
-                    className="reg-input"
+                    className={BIZ_INPUT_CLASS}
                     value={form.seaneb_id}
                     onChange={(e) =>
                       handleChange("seaneb_id", e.target.value.toLowerCase())
                     }
                     placeholder={t.seanebBranchPlaceholder}
                     autoComplete="off"
+                    disabled={seanebVerified && !editingSeanebId}
                   />
                   <button
                     type="button"
-                    className={`verify-btn ${seanebVerified ? "verified" : ""}`}
-                    disabled={!isValidSeaneb || checkingSeanebId}
+                    className={
+                      seanebVerified && !editingSeanebId
+                        ? BIZ_VERIFY_BUTTON_VERIFIED_CLASS
+                        : BIZ_VERIFY_BUTTON_BASE_CLASS
+                    }
+                    disabled={
+                      !isValidSeaneb ||
+                      checkingSeanebId ||
+                      (seanebVerified && !editingSeanebId)
+                    }
                     onClick={handleVerifySeanebId}
                   >
-                    {checkingSeanebId ? "Checking..." : seanebVerified ? "Verified" : "Verify"}
+                    {checkingSeanebId
+                      ? t.seanebIdCheckingLabel || t.verifying || "Checking..."
+                      : seanebVerified && !editingSeanebId
+                      ? `${t.seanebIdVerifiedLabel || t.verified || "Verified"} \u2713`
+                      : t.seanebIdVerifyLabel || t.verify || "Verify"}
                   </button>
                 </div>
+
+                {seanebVerified && !editingSeanebId && (
+                  <button
+                    type="button"
+                    className="mt-2 cursor-pointer rounded-lg border border-(--color-border-default) bg-(--color-surface-section) px-2.5 py-1.5 text-[12px] font-semibold text-(--color-link-primary) transition-colors duration-200 ease-in-out hover:border-(--color-border-brand-soft) hover:bg-(--color-btn-secondary-hover)"
+                    onClick={handleEditSeanebId}
+                  >
+                    {t.seanebIdEdit || "Edit SeaNeB ID"}
+                  </button>
+                )}
+
                 {form.seaneb_id && !isValidSeaneb && (
-                  <p className="field-helper error">
-                    6-30 characters. Use lowercase letters, numbers and hyphen (-).
+                  <p className={BIZ_HELPER_ERROR_CLASS}>
+                    {t.seanebIdFormatHelper ||
+                      "6-30 characters. Use lowercase letters, numbers and hyphen (-)."}
                   </p>
                 )}
-                {isValidSeaneb && !seanebVerified && (
-                  <p className="field-helper error">Verify SeaNeB ID before submission.</p>
-                )}
+
+                {!form.seaneb_id || isValidSeaneb ? (
+                  seanebIdMessage ? (
+                    <p
+                      className={
+                        seanebIdMessageType === "error"
+                          ? BIZ_HELPER_ERROR_CLASS
+                          : BIZ_HELPER_SUCCESS_CLASS
+                      }
+                    >
+                      {seanebIdMessage}
+                    </p>
+                  ) : isValidSeaneb && !seanebVerified ? (
+                    <p className={BIZ_HELPER_ERROR_CLASS}>
+                      {t.seanebIdVerifyRequired || "Verify SeaNeB ID before submission."}
+                    </p>
+                  ) : null
+                ) : null}
               </Field>
             </div>
           </section>
 
-          <section className="business-section-card">
-            <div className="business-section-head">
-              <h3>{t.contactSection}</h3>
-              <p>Numbers and email used for branch communication and verification.</p>
+          <section className="rounded-[16px] border border-[var(--color-border-bizpro)] bg-[linear-gradient(180deg,var(--color-white)_0%,var(--color-surface-section)_100%)] p-[18px] shadow-[0_10px_22px_rgba(15,23,42,0.05)]">
+            <div>
+              <h3 className="m-0 text-[16px] text-[var(--color-text-primary)]">{t.contactSection}</h3>
+              <p className="mb-0 mt-[5px] text-[13px] text-[var(--color-text-muted)]">
+                Numbers and email used for branch communication and verification.
+              </p>
             </div>
 
-            <div className="business-grid business-grid--2">
+            <div className="mt-3.5 grid grid-cols-2 gap-3.5 [@media(max-width:640px)]:grid-cols-1">
+              <Field label="Country Code *">
+                <div className="relative" ref={countryDropdownRef}>
+                  <button
+                    type="button"
+                    className="flex h-[46px] w-full items-center justify-between rounded-[11px] border border-[#d9e1ec] bg-[var(--color-white)] px-[12px] text-left transition-[border-color,box-shadow,transform] duration-200 ease-in-out hover:border-[#9fb8de] focus:border-[#0f4ec9] focus:outline-none focus:[box-shadow:0_0_0_4px_rgba(15,78,201,0.18)]"
+                    onClick={() => setShowCountries((prev) => !prev)}
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <img
+                        src={country.flag}
+                        alt={country.name}
+                        className="h-[16px] w-[24px] rounded-[2px] object-cover"
+                      />
+                      <span className="truncate text-[14px] text-[var(--color-text-primary)]">
+                        {country.name}
+                      </span>
+                    </span>
+                    <span className="ml-2 shrink-0 text-[13px] font-semibold text-[var(--color-text-muted-strong)]">
+                      {country.dialCode} {"\u25BE"}
+                    </span>
+                  </button>
+
+                  {showCountries && (
+                    <div className="absolute left-0 top-[50px] z-[70] max-h-[260px] w-full overflow-y-auto rounded-[12px] border border-[#d9e1ec] bg-[var(--color-white)] shadow-[0_14px_28px_rgba(15,23,42,0.12)]">
+                      {countries.map((item) => (
+                        <button
+                          type="button"
+                          key={`${item.code}-${item.dialCode}`}
+                          className="flex w-full items-center gap-[10px] border-b border-[var(--color-border-brand-soft)] px-3 py-[10px] text-left text-[14px] text-[var(--color-text-primary)] last:border-b-0 hover:bg-[var(--color-surface-muted)]"
+                          onMouseDown={(event) => {
+                            event.preventDefault();
+                            handleCountrySelect(item);
+                          }}
+                        >
+                          <img
+                            src={item.flag}
+                            alt={item.name}
+                            className="h-4 w-[22px] rounded-[2px] object-cover"
+                          />
+                          <span className="flex-1 truncate">{item.name}</span>
+                          <span className="text-[13px] text-[var(--color-text-muted-strong)]">
+                            {item.dialCode}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </Field>
+
               <Field label={t.primaryNumber}>
-                <div className="verify-input-wrapper">
+                <div className={BIZ_VERIFY_WRAPPER_CLASS}>
                   <input
-                    className="reg-input"
+                    className={BIZ_INPUT_CLASS}
                     value={form.primary_number}
                     onChange={(e) =>
                       handleChange("primary_number", e.target.value.replace(/\D/g, ""))
@@ -1137,7 +1111,11 @@ export default function BusinessRegistrationPage() {
                   />
                   <button
                     type="button"
-                    className={`verify-btn ${mobileVerified ? "verified" : ""}`}
+                    className={
+                      mobileVerified
+                        ? BIZ_VERIFY_BUTTON_VERIFIED_CLASS
+                        : BIZ_VERIFY_BUTTON_BASE_CLASS
+                    }
                     disabled={!isValidPrimaryNumber || sendingMobileOtp || mobileVerified}
                     onClick={handleSendBusinessMobileOtp}
                   >
@@ -1145,16 +1123,16 @@ export default function BusinessRegistrationPage() {
                   </button>
                 </div>
                 {!isValidPrimaryNumber && form.primary_number.length > 0 && (
-                  <p className="field-helper error">{t.primaryNumberHelper}</p>
+                  <p className={BIZ_HELPER_ERROR_CLASS}>{t.primaryNumberHelper}</p>
                 )}
                 {isValidPrimaryNumber && !mobileVerified && (
-                  <p className="field-helper error">Verify primary number before submission.</p>
+                  <p className={BIZ_HELPER_ERROR_CLASS}>Verify primary number before submission.</p>
                 )}
               </Field>
 
               <Field label={t.whatsappNumber}>
                 <input
-                  className="reg-input"
+                  className={BIZ_INPUT_CLASS}
                   value={form.whatsapp_number}
                   onChange={(e) =>
                     handleChange("whatsapp_number", e.target.value.replace(/\D/g, ""))
@@ -1165,15 +1143,15 @@ export default function BusinessRegistrationPage() {
                   autoComplete="tel"
                 />
                 {!isValidWhatsapp && (
-                  <p className="field-helper error">{t.whatsappNumberHelper}</p>
+                  <p className={BIZ_HELPER_ERROR_CLASS}>{t.whatsappNumberHelper}</p>
                 )}
               </Field>
 
               <Field label={`${t.businessEmail} (Optional)`} hint="If provided, email must be verified.">
-                <div className="verify-input-wrapper">
+                <div className={BIZ_VERIFY_WRAPPER_CLASS}>
                   <input
                     type="email"
-                    className="reg-input"
+                    className={BIZ_INPUT_CLASS}
                     value={form.business_email}
                     onChange={(e) => handleChange("business_email", e.target.value)}
                     autoComplete="email"
@@ -1181,7 +1159,11 @@ export default function BusinessRegistrationPage() {
                   />
                   <button
                     type="button"
-                    className={`verify-btn ${emailVerified ? "verified" : ""}`}
+                    className={
+                      emailVerified
+                        ? BIZ_VERIFY_BUTTON_VERIFIED_CLASS
+                        : BIZ_VERIFY_BUTTON_BASE_CLASS
+                    }
                     disabled={!isValidEmail || sendingEmailOtp || emailVerified}
                     onClick={requestBusinessEmailOtp}
                   >
@@ -1190,9 +1172,9 @@ export default function BusinessRegistrationPage() {
                 </div>
 
                 {emailOtpSent && !emailVerified && (
-                  <div className="verify-otp-row">
+                  <div className={BIZ_VERIFY_OTP_ROW_CLASS}>
                     <input
-                      className="reg-input"
+                      className={BIZ_INPUT_CLASS}
                       value={emailOtp}
                       onChange={(e) =>
                         setEmailOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
@@ -1203,7 +1185,7 @@ export default function BusinessRegistrationPage() {
                     />
                     <button
                       type="button"
-                      className="verify-otp-btn"
+                      className={BIZ_VERIFY_OTP_BUTTON_CLASS}
                       disabled={emailOtp.length < 4 || verifyingEmailOtp}
                       onClick={handleVerifyBusinessEmailOtp}
                     >
@@ -1212,7 +1194,13 @@ export default function BusinessRegistrationPage() {
                   </div>
                 )}
 
-                <p className={`field-helper ${emailVerified || !form.business_email.trim() ? "" : "error"}`}>
+                <p
+                  className={
+                    emailVerified || !form.business_email.trim()
+                      ? BIZ_HELPER_CLASS
+                      : BIZ_HELPER_ERROR_CLASS
+                  }
+                >
                   {emailVerified
                     ? t.emailVerifiedSuccess
                     : !form.business_email.trim()
@@ -1223,16 +1211,18 @@ export default function BusinessRegistrationPage() {
             </div>
           </section>
 
-          <section className="business-section-card">
-            <div className="business-section-head">
-              <h3>{t.locationSection}</h3>
-              <p>Add accurate location details for discovery and operations.</p>
+          <section className="rounded-2xl border border-(--color-border-bizpro) bg-[linear-gradient(180deg,var(--color-white)_0%,var(--color-surface-section)_100%)] p-[18px] shadow-[0_10px_22px_rgba(15,23,42,0.05)]">
+            <div>
+              <h3 className="m-0 text-[16px] text-(--color-text-primary)">{t.locationSection}</h3>
+              <p className="mb-0 mt-1.25 text-[13px] text-(--color-text-muted)">
+                Add accurate location details for discovery and operations.
+              </p>
             </div>
 
-            <div className="business-grid business-grid--2">
+            <div className="mt-3.5 grid grid-cols-2 gap-3.5 [@media(max-width:640px)]:grid-cols-1">
               <Field label={t.address}>
                 <input
-                  className="reg-input"
+                  className={BIZ_INPUT_CLASS}
                   value={form.address}
                   onChange={(e) => handleChange("address", e.target.value)}
                   placeholder={t.addressPlaceholder}
@@ -1242,7 +1232,7 @@ export default function BusinessRegistrationPage() {
 
               <Field label={t.landmark}>
                 <input
-                  className="reg-input"
+                  className={BIZ_INPUT_CLASS}
                   value={form.landmark}
                   onChange={(e) => handleChange("landmark", e.target.value)}
                   placeholder={t.landmarkPlaceholder}
@@ -1254,18 +1244,22 @@ export default function BusinessRegistrationPage() {
                   value={form.place.label}
                   onChange={handlePlaceChange}
                   placeholder={t.placePlaceholder}
+                  wrapperClassName={BIZ_AUTOCOMPLETE_WRAPPER_CLASS}
+                  inputClassName={BIZ_INPUT_CLASS}
+                  suggestionBoxClassName={BIZ_SUGGESTION_BOX_CLASS}
+                  suggestionItemClassName={BIZ_SUGGESTION_ITEM_CLASS}
                 />
               </Field>
 
               <Field label={t.aboutBranch}>
                 <textarea
-                  className="reg-input reg-textarea"
+                  className={BIZ_TEXTAREA_CLASS}
                   value={form.about_branch}
                   onChange={(e) => handleChange("about_branch", e.target.value)}
                   placeholder={t.aboutBranchPlaceholder}
                   rows={4}
                 />
-                <p className={`field-helper ${hasBranchSummary ? "" : "error"}`}>
+                <p className={hasBranchSummary ? BIZ_HELPER_CLASS : BIZ_HELPER_ERROR_CLASS}>
                   {hasBranchSummary
                     ? t.aboutBranchHelper
                     : `Minimum 20 characters needed (${form.about_branch.trim().length}/20)`}
@@ -1274,17 +1268,19 @@ export default function BusinessRegistrationPage() {
             </div>
           </section>
 
-          <section className="business-section-card">
-            <div className="business-section-head">
-              <h3>{t.complianceSection}</h3>
-              <p>You can verify PAN and GST now or after branch creation.</p>
+          <section className="rounded-2xl border border-(--color-border-bizpro) bg-[linear-gradient(180deg,var(--color-white)_0%,var(--color-surface-section)_100%)] p-[18px] shadow-[0_10px_22px_rgba(15,23,42,0.05)]">
+            <div>
+              <h3 className="m-0 text-[16px] text-[var(--color-text-primary)]">{t.complianceSection}</h3>
+              <p className="mb-0 mt-[5px] text-[13px] text-[var(--color-text-muted)]">
+                You can verify PAN and GST now or after branch creation.
+              </p>
             </div>
 
-            <div className="business-grid business-grid--2">
+            <div className="mt-[14px] grid grid-cols-2 gap-[14px] [@media(max-width:640px)]:grid-cols-1">
               <Field label={t.panNumberOptional}>
-                <div className="verify-input-wrapper">
+                <div className={BIZ_VERIFY_WRAPPER_CLASS}>
                   <input
-                    className="reg-input"
+                    className={BIZ_INPUT_CLASS}
                     value={form.pan_number}
                     onChange={(e) => handleChange("pan_number", e.target.value.toUpperCase())}
                     maxLength={10}
@@ -1292,7 +1288,11 @@ export default function BusinessRegistrationPage() {
                   />
                   <button
                     type="button"
-                    className={`verify-btn ${panVerified ? "verified" : ""}`}
+                    className={
+                      panVerified
+                        ? BIZ_VERIFY_BUTTON_VERIFIED_CLASS
+                        : BIZ_VERIFY_BUTTON_BASE_CLASS
+                    }
                     disabled={!form.pan_number.trim() || !isPanFormatValid || panVerified || verifyingPan}
                     onClick={handleVerifyPan}
                   >
@@ -1300,14 +1300,14 @@ export default function BusinessRegistrationPage() {
                   </button>
                 </div>
                 {hasPan && !isPanFormatValid && (
-                  <p className="field-helper error">{t.panFormatHelper}</p>
+                  <p className={BIZ_HELPER_ERROR_CLASS}>{t.panFormatHelper}</p>
                 )}
               </Field>
 
               <Field label={t.gstinOptional}>
-                <div className="verify-input-wrapper">
+                <div className={BIZ_VERIFY_WRAPPER_CLASS}>
                   <input
-                    className="reg-input"
+                    className={BIZ_INPUT_CLASS}
                     value={form.gstin}
                     onChange={(e) => handleChange("gstin", e.target.value.toUpperCase())}
                     maxLength={15}
@@ -1315,7 +1315,11 @@ export default function BusinessRegistrationPage() {
                   />
                   <button
                     type="button"
-                    className={`verify-btn ${gstVerified ? "verified" : ""}`}
+                    className={
+                      gstVerified
+                        ? BIZ_VERIFY_BUTTON_VERIFIED_CLASS
+                        : BIZ_VERIFY_BUTTON_BASE_CLASS
+                    }
                     disabled={!form.gstin.trim() || !isGstinFormatValid || gstVerified || verifyingGst}
                     onClick={handleVerifyGst}
                   >
@@ -1323,23 +1327,29 @@ export default function BusinessRegistrationPage() {
                   </button>
                 </div>
                 {hasGstin && !isGstinFormatValid && (
-                  <p className="field-helper error">{t.gstinFormatHelper}</p>
+                  <p className={BIZ_HELPER_ERROR_CLASS}>{t.gstinFormatHelper}</p>
                 )}
               </Field>
             </div>
           </section>
 
-          <div className="business-submit-panel">
-            <label className="checkbox-row">
+          <div className="rounded-[14px] border border-[var(--color-border-bizpro)] bg-[var(--color-white)] p-[14px]">
+            <label className="mb-3 flex items-center gap-[10px] text-[14px] text-[var(--color-text-body-strong)]">
               <input
                 type="checkbox"
+                className="h-4 w-4"
                 checked={form.agree}
                 onChange={(e) => handleChange("agree", e.target.checked)}
               />
               <span>I agree to the business terms and conditions</span>
             </label>
 
-            <PrimaryButton disabled={!isFormComplete || loading}>
+            <PrimaryButton
+              className="mt-[18px] min-h-12 rounded-[12px] text-[15px] font-bold tracking-[0.01em]"
+              activeClassName="cursor-pointer bg-[linear-gradient(135deg,#0f4ec9_0%,#0b3ea2_100%)] text-[var(--color-white)] shadow-[0_12px_24px_rgba(15,78,201,0.32)] hover:translate-y-[-1px] hover:shadow-[0_14px_30px_rgba(15,78,201,0.40)]"
+              disabledClassName="cursor-not-allowed bg-[var(--color-btn-disabled-bg)] text-[var(--color-btn-disabled-text)]"
+              disabled={!isFormComplete || loading}
+            >
               {loading ? t.submitting : t.registerBusiness}
             </PrimaryButton>
           </div>
@@ -1351,10 +1361,12 @@ export default function BusinessRegistrationPage() {
 
 function Field({ label, hint, children }) {
   return (
-    <div className="business-form-group">
-      <label className="business-form-label">{label}</label>
+    <div className="min-w-0">
+      <label className="mb-[7px] block text-[13px] font-semibold text-[var(--color-text-form-label)]">
+        {label}
+      </label>
       {children}
-      {hint && <p className="business-form-hint">{hint}</p>}
+      {hint && <p className="mt-[7px] text-[12px] text-[var(--color-text-muted)]">{hint}</p>}
     </div>
   );
 }
