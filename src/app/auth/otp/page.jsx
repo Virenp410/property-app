@@ -114,9 +114,9 @@ function VerifyOtpContent() {
       showBack={true}
       backFallback="/auth/login"
     >
-      <div className="mx-auto max-w-[420px] text-center">
-        <h2 className="mb-[6px] text-[26px] font-semibold">{t.otpTitle}</h2>
-        <p className="mb-[22px] text-[14px] text-[#666666]">{subtitle}</p>
+      <div className="mx-auto max-w-105 text-center">
+        <h2 className="mb-1.5 text-[26px] font-semibold">{t.otpTitle}</h2>
+        <p className="mb-5.5 text-[14px] text-[#666666]">{subtitle}</p>
 
         <OtpInput length={4} onComplete={setFinalOtp} />
 
@@ -128,9 +128,9 @@ function VerifyOtpContent() {
           {loading ? t.verifying : t.verifyOtp}
         </PrimaryButton>
 
-        {infoMessage && <p className="mt-3 text-[13px] text-[var(--auth-muted)]">{infoMessage}</p>}
+        {infoMessage && <p className="mt-3 text-[13px] text-(--auth-muted)">{infoMessage}</p>}
 
-        <div className="mt-[14px] text-center">
+        <div className="mt-3.5 text-center">
           <button
             className="cursor-pointer border-0 bg-transparent p-0 text-[14px] text-[#1a73e8] underline disabled:cursor-not-allowed disabled:text-[#aaaaaa]"
             disabled={cooldown > 0}
@@ -145,7 +145,7 @@ function VerifyOtpContent() {
           </button>
 
           {!isEmail && showResendOptions && cooldown === 0 && (
-            <div className="mt-2 flex items-center justify-center gap-[10px]">
+            <div className="mt-2 flex items-center justify-center gap-2.5">
               <button
                 className="cursor-pointer border-0 bg-transparent p-0 text-[14px] text-[#1a73e8] disabled:cursor-not-allowed disabled:text-[#aaaaaa]"
                 disabled={resending}
