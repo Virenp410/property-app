@@ -1,86 +1,59 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Lottie from "lottie-react";
 
 import AuthLayout from "@/app/component/AuthLayout";
 import useTranslation from "@/app/hook/useTranslation";
+import useAppLang from "@/app/hook/useAppLang";
 import successAnim from "@/app/constant/lottieyfile/Checked.json";
-import PrimaryButton from "@/app/component/PrimaryButton";
 import { clearSession } from "@/app/services/api";
-import { getCookie, removeCookie } from "@/app/services/cookieStore";
-
-const getSafeInternalRedirectPath = (value) => {
-  const next = String(value || "").trim();
-  if (!next) return "";
-  if (!next.startsWith("/")) return "";
-  if (next.startsWith("//")) return "";
-  if (next.startsWith("/auth/login")) return "";
-  return next;
-};
-
-const withLangQuery = (path, lang) => {
-  const [basePart, hashPart = ""] = String(path || "").split("#");
-  const [pathname, queryString = ""] = basePart.split("?");
-  const query = new URLSearchParams(queryString);
-  if (!query.get("lang")) {
-    query.set("lang", lang);
-  }
-  const hashSuffix = hashPart ? `#${hashPart}` : "";
-  const finalQuery = query.toString();
-  return finalQuery ? `${pathname}?${finalQuery}${hashSuffix}` : `${pathname}${hashSuffix}`;
-};
+import { getCookie, removeCookie, setCookie } from "@/app/services/cookieStore";
 
 function SuccessPageContent() {
   const router = useRouter();
-  const params = useSearchParams();
-  const lang = params.get("lang") || "en";
-
+  const searchParams = useSearchParams();
+  const [lang] = useAppLang(searchParams);
   const t = useTranslation(lang);
-  const handleRedirect = () => {
-    const redirectFromQuery = params.get("redirect_to");
-    const redirectFromCookie =
-      typeof window !== "undefined" ? getCookie("post_auth_redirect") : "";
-    const postAuthRedirect =
-      getSafeInternalRedirectPath(redirectFromQuery) ||
-      getSafeInternalRedirectPath(redirectFromCookie);
-    const accessToken =
-      typeof window !== "undefined"
-        ? getCookie("access_token_auto") || getCookie("access_token")
-        : null;
-    const csrfToken =
-      typeof window !== "undefined"
-        ? getCookie("csrf_token_auto") || getCookie("csrf_token")
-        : null;
 
-    const hasSession =
-      typeof accessToken === "string" &&
-      accessToken.length > 10 &&
-      typeof csrfToken === "string" &&
-      csrfToken.length > 10;
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const accessToken =
+        typeof window !== "undefined"
+          ? getCookie("access_token_auto") || getCookie("access_token")
+          : null;
+      const csrfToken =
+        typeof window !== "undefined"
+          ? getCookie("csrf_token_auto") || getCookie("csrf_token")
+          : null;
 
-    if (hasSession) {
-      if (postAuthRedirect) {
+      const hasSession =
+        typeof accessToken === "string" &&
+        accessToken.length > 10 &&
+        typeof csrfToken === "string" &&
+        csrfToken.length > 10;
+
+      if (hasSession) {
         removeCookie("post_auth_redirect");
-        router.push(withLangQuery(postAuthRedirect, lang));
+        setCookie("dashboard_mode", "user", { days: 365 });
+        router.push("/auth/post-register");
         return;
       }
-      router.push(withLangQuery("/auth/userdash", lang));
-      return;
-    }
 
-    removeCookie("post_auth_redirect");
-    clearSession();
-    router.push(`/auth/login?lang=${lang}`);
-  };
+      removeCookie("post_auth_redirect");
+      clearSession();
+      router.push("/auth/login");
+    }, 2200);
+
+    return () => clearTimeout(timer);
+  }, [lang, router]);
 
   return (
     <AuthLayout
       lang={lang}
       showLang={false}
-      showBack={true}
-      backFallback="/auth/login"
+      showBack={false}
     >
       <Lottie
         animationData={successAnim}
@@ -88,12 +61,9 @@ function SuccessPageContent() {
         style={{ height: 180, margin: "0 auto" }}
       />
 
-      <h2 className="success-title">{t.successTitle} 🎉</h2>
+      <h2 className="success-title">{t.successTitle}</h2>
       <p className="success-subtitle">{t.successSubtitle}</p>
-
-      <PrimaryButton onClick={handleRedirect}>
-        {t.goToDashboard}
-      </PrimaryButton>
+      <p className="mt-3 text-center text-[13px] text-(--auth-muted)">Redirecting...</p>
     </AuthLayout>
   );
 }

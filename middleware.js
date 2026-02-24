@@ -4,12 +4,15 @@ const resolveProductKey = () => {
   const key = String(process.env.NEXT_PUBLIC_PRODUCT_KEY || "auto").trim();
   return key || "auto";
 };
+const resolveWebAppUrl = () =>
+  String(process.env.NEXT_PUBLIC_WEB_APP_URL || "http://localhost:1003")
+    .replace(/\/$/, "");
 
 const isLoginRoute = (pathname) => pathname.startsWith("/auth/login");
 
 const isProtectedRoute = (pathname) =>
   pathname.startsWith("/auth/success") ||
-  pathname.startsWith("/auth/userdash") ||
+  pathname.startsWith("/auth/post-register") ||
   pathname.startsWith("/auth/dealerdash") ||
   pathname.startsWith("/auth/business-reg");
 
@@ -44,11 +47,7 @@ export function middleware(request) {
 
   if (!isAuthenticated && isProtectedRoute(pathname)) {
     const redirectUrl = new URL("/auth/login", request.url);
-    const lang = searchParams.get("lang");
     const requestedPath = getRequestedPathWithQuery(request.nextUrl);
-    if (lang) {
-      redirectUrl.searchParams.set("lang", lang);
-    }
     if (requestedPath) {
       redirectUrl.searchParams.set("next", requestedPath);
     }
@@ -60,11 +59,9 @@ export function middleware(request) {
   }
 
   const nextPath = getSafeInternalNextPath(searchParams);
-  const redirectUrl = new URL(nextPath || "/auth/userdash", request.url);
-  const lang = searchParams.get("lang");
-  if (lang) {
-    redirectUrl.searchParams.set("lang", lang);
-  }
+  const redirectUrl = nextPath
+    ? new URL(nextPath, request.url)
+    : new URL(resolveWebAppUrl());
   return NextResponse.redirect(redirectUrl);
 }
 

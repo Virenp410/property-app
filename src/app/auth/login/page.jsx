@@ -1,12 +1,13 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import countries from "@/app/constant/country.json";
 import AuthLayout from "@/app/component/AuthLayout";
 import useTranslation from "@/app/hook/useTranslation";
+import useAppLang from "@/app/hook/useAppLang";
 import PrimaryButton from "@/app/component/PrimaryButton";
 
 import { sendOtp } from "@/app/services/otp.services";
@@ -27,10 +28,7 @@ function LoginContent() {
 
   const [mobile, setMobile] = useState("");
   const [method, setMethod] = useState("whatsapp");
-  const [lang, setLang] = useState(() => {
-    const value = String(searchParams?.get("lang") || "en").trim().toLowerCase();
-    return value || "en";
-  });
+  const [lang, setLang] = useAppLang(searchParams);
   const [country, setCountry] = useState(countries[0]);
   const [showCountries, setShowCountries] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -39,13 +37,6 @@ function LoginContent() {
     () => getSafeInternalNextPath(searchParams?.get("next")),
     [searchParams]
   );
-
-  useEffect(() => {
-    const value = String(searchParams?.get("lang") || "").trim().toLowerCase();
-    if (value && value !== lang) {
-      setLang(value);
-    }
-  }, [lang, searchParams]);
 
   const t = useTranslation(lang);
   const isValidMobile = mobile.length === 10;
@@ -73,9 +64,7 @@ function LoginContent() {
 
       console.log("OTP Sent:", res?.data);
 
-      router.push(
-        `/auth/otp?mobile=${country.dialCode}${mobile}&lang=${lang}`
-      );
+      router.push("/auth/otp");
     } catch (err) {
       const status = Number(err?.response?.status || 0);
       const message =

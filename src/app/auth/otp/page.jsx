@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import AuthLayout from "@/app/component/AuthLayout";
 import OtpInput from "@/app/component/OtpInput";
 import useTranslation from "@/app/hook/useTranslation";
+import useAppLang from "@/app/hook/useAppLang";
 import PrimaryButton from "@/app/component/PrimaryButton";
 import useOtp from "@/app/hook/useOtp";
 import { getJsonCookie, setCookie } from "@/app/services/cookieStore";
@@ -19,27 +20,23 @@ const getSafeInternalRedirectPath = (value) => {
   return next;
 };
 
-const withLangQuery = (path, lang) => {
-  const [basePart, hashPart = ""] = String(path || "").split("#");
-  const [pathname, queryString = ""] = basePart.split("?");
-  const params = new URLSearchParams(queryString);
-  if (!params.get("lang")) {
-    params.set("lang", lang);
-  }
-  const query = params.toString();
-  const hashSuffix = hashPart ? `#${hashPart}` : "";
-  return query ? `${pathname}?${query}${hashSuffix}` : `${pathname}${hashSuffix}`;
-};
-
 function VerifyOtpContent() {
   const router = useRouter();
-  const params = useSearchParams();
+  const searchParams = useSearchParams();
 
-  const [lang, setLang] = useState(params.get("lang") || "en");
+  const [lang, setLang] = useAppLang(searchParams);
   const t = useTranslation(lang);
   const webAppUrl = String(
     process.env.NEXT_PUBLIC_WEB_APP_URL || "http://localhost:1003"
   ).replace(/\/$/, "");
+
+  const redirectToWebHome = () => {
+    if (typeof window !== "undefined") {
+      window.location.href = `${webAppUrl}/`;
+      return;
+    }
+    router.replace(`${webAppUrl}/`);
+  };
 
   const [finalOtp, setFinalOtp] = useState("");
   const [showResendOptions, setShowResendOptions] = useState(false);
@@ -72,8 +69,15 @@ function VerifyOtpContent() {
           typeof response?.access_token === "string" &&
           response.access_token.length > 10;
 
+        // Normal login flow: existing users always land on web home.
+        if (hasAccessToken && mobilePurpose === 0) {
+          setCookie("dashboard_mode", "user", { days: 365 });
+          redirectToWebHome();
+          return;
+        }
+
         if (redirectTo && mobilePurpose !== 0) {
-          router.replace(withLangQuery(redirectTo, lang));
+          router.replace(redirectTo);
           return;
         }
 
@@ -81,25 +85,25 @@ function VerifyOtpContent() {
           if (redirectTo) {
             setCookie("post_auth_redirect", redirectTo, { days: 1 });
             router.replace(
-              `/auth/reg?lang=${lang}&redirect_to=${encodeURIComponent(redirectTo)}`
+              `/auth/reg?redirect_to=${encodeURIComponent(redirectTo)}`
             );
             return;
           }
-          router.replace(`/auth/reg?lang=${lang}`);
+          router.replace("/auth/reg");
           return;
         }
 
         if (redirectTo) {
-          router.replace(withLangQuery(redirectTo, lang));
+          if (redirectTo === "/") {
+            redirectToWebHome();
+            return;
+          }
+          router.replace(redirectTo);
           return;
         }
 
         setCookie("dashboard_mode", "user", { days: 365 });
-        if (typeof window !== "undefined") {
-          window.location.href = `${webAppUrl}/?lang=${encodeURIComponent(lang)}`;
-          return;
-        }
-        router.replace(`/auth/userdash?lang=${lang}`);
+        redirectToWebHome();
       };
 
       continueRouting();
