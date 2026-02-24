@@ -2,7 +2,7 @@
 
 export default function ServicesRoutePage() {
   const webAppUrl = String(
-    process.env.NEXT_PUBLIC_WEB_APP_URL || "http://localhost:3000"
+    process.env.NEXT_PUBLIC_WEB_APP_URL || "http://localhost:1003"
   ).replace(/\/$/, "");
 
   redirect(`${webAppUrl}/services`);

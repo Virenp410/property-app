@@ -37,6 +37,9 @@ function VerifyOtpContent() {
 
   const [lang, setLang] = useState(params.get("lang") || "en");
   const t = useTranslation(lang);
+  const webAppUrl = String(
+    process.env.NEXT_PUBLIC_WEB_APP_URL || "http://localhost:1003"
+  ).replace(/\/$/, "");
 
   const [finalOtp, setFinalOtp] = useState("");
   const [showResendOptions, setShowResendOptions] = useState(false);
@@ -92,6 +95,10 @@ function VerifyOtpContent() {
         }
 
         setCookie("dashboard_mode", "user", { days: 365 });
+        if (typeof window !== "undefined") {
+          window.location.href = `${webAppUrl}/?lang=${encodeURIComponent(lang)}`;
+          return;
+        }
         router.replace(`/auth/userdash?lang=${lang}`);
       };
 

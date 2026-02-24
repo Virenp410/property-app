@@ -11,7 +11,7 @@ import { getCurrentUserProfile } from "@/app/services/user.services";
 export default function DealerDashboardPage() {
   const router = useRouter();
   const webAppUrl = String(
-    process.env.NEXT_PUBLIC_WEB_APP_URL || "http://localhost:3000"
+    process.env.NEXT_PUBLIC_WEB_APP_URL || "http://localhost:1003"
   ).replace(/\/$/, "");
   const [profileInfo, setProfileInfo] = useState({ fullName: "-", seanebId: "-" });
   const [businessInfo, setBusinessInfo] = useState({

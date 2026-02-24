@@ -266,15 +266,15 @@ function RegistrationFormContent() {
       showBack={true}
       backFallback="/auth/otp"
     >
-      <h2 className="text-[26px] font-semibold text-[var(--color-black)]">{t.completeProfile}</h2>
-      <p className="mt-[6px] text-[14px] text-[var(--auth-muted)]">{t.profileSubtitle}</p>
+      <h2 className="text-[26px] font-semibold text-black">{t.completeProfile}</h2>
+      <p className="mt-1.5 text-[14px] text-(--auth-muted)">{t.profileSubtitle}</p>
 
       {/* First + Last */}
-      <div className="mb-5 mt-[22px] grid grid-cols-2 gap-[22px] [@media(max-width:640px)]:grid-cols-1">
+      <div className="mb-5 mt-5.5 grid grid-cols-2 gap-5.5 [@media(max-width:640px)]:grid-cols-1">
         <div className="min-w-0">
-          <label className="mb-[6px] block text-[14px] text-[var(--auth-field-label)]">{t.firstname}</label>
+          <label className="mb-1.5 block text-[14px] text-(--auth-field-label)">{t.firstname}</label>
           <input
-            className="h-[44px] w-full rounded-[10px] border border-[var(--auth-border)] px-[14px] py-3 text-[14px] text-[var(--color-black)] placeholder:text-[var(--auth-placeholder)] focus:border-[var(--auth-border-strong)] focus:outline-none"
+            className="h-11 w-full rounded-[10px] border border-(--auth-border) px-3.5 py-3 text-[14px] text-black placeholder:text-(--auth-placeholder) focus:border-(--auth-border-strong) focus:outline-none"
             value={form.firstname}
             onChange={(e) =>
               handleChange("firstname", e.target.value)
@@ -283,9 +283,9 @@ function RegistrationFormContent() {
         </div>
 
         <div className="min-w-0">
-          <label className="mb-[6px] block text-[14px] text-[var(--auth-field-label)]">{t.lastname}</label>
+          <label className="mb-1.5 block text-[14px] text-(--auth-field-label)">{t.lastname}</label>
           <input
-            className="h-[44px] w-full rounded-[10px] border border-[var(--auth-border)] px-[14px] py-3 text-[14px] text-[var(--color-black)] placeholder:text-[var(--auth-placeholder)] focus:border-[var(--auth-border-strong)] focus:outline-none"
+            className="h-11 w-full rounded-[10px] border border-(--auth-border) px-3.5 py-3 text-[14px] text-black placeholder:text-(--auth-placeholder) focus:border-(--auth-border-strong) focus:outline-none"
             value={form.lastname}
             onChange={(e) =>
               handleChange("lastname", e.target.value)
@@ -295,13 +295,13 @@ function RegistrationFormContent() {
       </div>
 
       {/* Email + Gender */}
-      <div className="mb-5 mt-[22px] grid grid-cols-2 gap-[22px] [@media(max-width:640px)]:grid-cols-1">
+      <div className="mb-5 mt-5.5 grid grid-cols-2 gap-5.5 [@media(max-width:640px)]:grid-cols-1">
         <div className="min-w-0">
-          <label className="mb-[6px] block text-[14px] text-[var(--auth-field-label)]">{t.email} (Optional)</label>
+          <label className="mb-1.5 block text-[14px] text-(--auth-field-label)">{t.email} (Optional)</label>
           <div className="relative w-full">
             <input
               type="email"
-              className="h-[44px] w-full rounded-[10px] border border-[var(--auth-border)] px-[14px] py-3 pr-[90px] text-[14px] text-[var(--color-black)] placeholder:text-[var(--auth-placeholder)] focus:border-[var(--auth-border-strong)] focus:outline-none"
+              className="h-11 w-full rounded-[10px] border border-(--auth-border) px-3.5 py-3 pr-22.5 text-[14px] text-black placeholder:text-(--auth-placeholder) focus:border-(--auth-border-strong) focus:outline-none"
               value={form.email}
               onChange={(e) =>
                 handleChange("email", e.target.value)
@@ -310,10 +310,10 @@ function RegistrationFormContent() {
 
             <button
               type="button"
-              className={`absolute right-[10px] top-1/2 h-8 -translate-y-1/2 whitespace-nowrap rounded-[6px] border px-3 text-[12px] ${
+              className={`absolute right-2.5 top-1/2 h-8 -translate-y-1/2 whitespace-nowrap rounded-md border px-3 text-[12px] ${
                 emailVerified
-                  ? "cursor-default border-[var(--color-success)] bg-[var(--color-success)] text-[var(--color-white)]"
-                  : "border-[var(--auth-border-light)] bg-[var(--color-white)] text-[var(--color-black)] hover:bg-[var(--color-surface-muted)]"
+                  ? "cursor-default border-(--color-success) bg-(--color-success) text-white"
+                  : "border-(--auth-border-light) bg-white text-black hover:bg-(--color-surface-muted)"
               }`}
               disabled={!isValidEmail || sendingOtp}
               onClick={async () => {
@@ -339,7 +339,7 @@ function RegistrationFormContent() {
           </div>
         </div>
         <div className="min-w-0">
-          <label className="mb-[6px] block text-[14px] text-[var(--auth-field-label)]">{t.gender}</label>
+          <label className="mb-1.5 block text-[14px] text-(--auth-field-label)">{t.gender}</label>
           <CustomDropdown
             value={form.gender}
             onChange={(val) =>
@@ -352,9 +352,9 @@ function RegistrationFormContent() {
       </div>
 
       {/* Hometown */}
-      <div className="mb-5 mt-[22px] grid grid-cols-2 gap-[22px] [@media(max-width:640px)]:grid-cols-1">
+      <div className="mb-5 mt-5.5 grid grid-cols-2 gap-5.5 [@media(max-width:640px)]:grid-cols-1">
         <div className="min-w-0">
-          <label className="mb-[6px] block text-[14px] text-[var(--auth-field-label)]">{t.hometown}</label>
+          <label className="mb-1.5 block text-[14px] text-(--auth-field-label)">{t.hometown}</label>
           <AutoComplete
             value={form.hometown.label}
             onChange={(val) =>
@@ -366,7 +366,7 @@ function RegistrationFormContent() {
         </div>
 
         <div className="min-w-0">
-          <label className="mb-[6px] block text-[14px] text-[var(--auth-field-label)]">{t.dob}</label>
+          <label className="mb-1.5 block text-[14px] text-(--auth-field-label)">{t.dob}</label>
           <DatePicker
             value={form.dob}
             onChange={(val) =>
@@ -402,7 +402,7 @@ function RegistrationFormContent() {
         }
       />
 
-      <label className="mt-[22px] flex gap-[10px] text-[14px] text-[var(--auth-field-label)]">
+      <label className="mt-5.5 flex gap-2.5 text-[14px] text-(--auth-field-label)">
         <input
           type="checkbox"
           checked={form.agree}

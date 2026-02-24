@@ -23,7 +23,7 @@ const USERDASH_SEEN_COOKIE = "userdash_seen";
 export default function DashboardPage() {
   const router = useRouter();
   const webAppUrl = String(
-    process.env.NEXT_PUBLIC_WEB_APP_URL || "http://localhost:3000"
+    process.env.NEXT_PUBLIC_WEB_APP_URL || "http://localhost:1003"
   ).replace(/\/$/, "");
   const [loading, setLoading] = useState(true);
   const [redirecting, setRedirecting] = useState(false);

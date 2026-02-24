@@ -17,7 +17,7 @@ const toQueryString = (searchParams) => {
 
 export default async function LegacyListingRedirect({ params, searchParams }) {
   const webAppUrl = String(
-    process.env.NEXT_PUBLIC_WEB_APP_URL || "http://localhost:3000"
+    process.env.NEXT_PUBLIC_WEB_APP_URL || "http://localhost:1003"
   ).replace(/\/$/, "");
 
   const resolvedParams = await params;
