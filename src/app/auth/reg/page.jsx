@@ -3,25 +3,26 @@
 import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import AuthLayout from "@/app/component/AuthLayout";
-import useTranslation from "@/app/hook/useTranslation";
-import AutoComplete from "@/app/component/AutoComplete";
-import DatePicker from "@/app/component/DatePicker";
-import PrimaryButton from "@/app/component/PrimaryButton";
-import CustomDropdown from "@/app/component/CustomDropdown";
-import SeanebIdField from "@/app/component/SeanebId";
+import AuthLayout from "@/components/AuthLayout";
+import useTranslation from "@/hooks/useTranslation";
+import useAppLang from "@/hooks/useAppLang";
+import AutoComplete from "@/components/AutoComplete";
+import DatePicker from "@/components/DatePicker";
+import PrimaryButton from "@/components/PrimaryButton";
+import CustomDropdown from "@/components/CustomDropdown";
+import SeanebIdField from "@/components/SeanebId";
 
-import { signupUser } from "@/app/services/auth.services";
-import { sendEmailOtp } from "@/app/services/otp.services";
-import { setSessionTokens } from "@/app/services/api";
-import { PRODUCT_KEY } from "@/app/services/productKey";
+import { signupUser } from "@/services/auth.services";
+import { sendEmailOtp, sendOtp } from "@/services/otp.services";
+import { setSessionTokens } from "@/services/api";
+import { PRODUCT_KEY } from "@/lib/productKey";
 import {
   getCookie,
   setCookie,
   removeCookie,
   getJsonCookie,
   setJsonCookie,
-} from "@/app/services/cookieStore";
+} from "@/services/cookieStore";
 
 const EMPTY_FORM = {
   firstname: "",
@@ -34,6 +35,64 @@ const EMPTY_FORM = {
   agree: false,
 };
 
+const MINIMUM_REGISTRATION_AGE = 13;
+const SEANEB_VERIFIED_COOKIE = "seaneb_id_verified";
+const VERIFIED_SEANEB_ID_COOKIE = "verified_seaneb_id";
+
+const parseDobToDate = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+
+  let year = 0;
+  let month = 0;
+  let day = 0;
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const parts = raw.split("-");
+    year = Number(parts[0]);
+    month = Number(parts[1]);
+    day = Number(parts[2]);
+  } else if (/^\d{2}-\d{2}-\d{4}$/.test(raw)) {
+    const parts = raw.split("-");
+    day = Number(parts[0]);
+    month = Number(parts[1]);
+    year = Number(parts[2]);
+  } else {
+    const fallback = new Date(raw);
+    if (Number.isNaN(fallback.getTime())) return null;
+    fallback.setHours(0, 0, 0, 0);
+    return fallback;
+  }
+
+  if (!year || !month || !day) return null;
+  const date = new Date(year, month - 1, day);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
+const isAtLeastAge = (dobValue, minimumAge) => {
+  const dobDate = parseDobToDate(dobValue);
+  if (!dobDate) return false;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const threshold = new Date(
+    today.getFullYear() - Number(minimumAge || 0),
+    today.getMonth(),
+    today.getDate()
+  );
+  threshold.setHours(0, 0, 0, 0);
+  return dobDate <= threshold;
+};
+
 const getSafeInternalRedirectPath = (value) => {
   const next = String(value || "").trim();
   if (!next) return "";
@@ -43,10 +102,29 @@ const getSafeInternalRedirectPath = (value) => {
   return next;
 };
 
+const REG_SECTION_CLASS =
+  "rounded-[14px] border border-[var(--auth-border)] bg-[linear-gradient(180deg,var(--color-white)_0%,var(--color-surface-section)_100%)] p-4 shadow-[0_8px_18px_rgba(15,23,42,0.06)]";
+const REG_LABEL_CLASS = "mb-1.5 block text-[14px] font-medium text-(--auth-field-label)";
+const REG_INPUT_CLASS =
+  "h-11 w-full rounded-[10px] border border-(--auth-border) bg-[var(--color-white)] px-3.5 py-3 text-[14px] text-black placeholder:text-(--auth-placeholder) transition-[border-color,box-shadow] duration-200 ease-in-out focus:border-(--auth-border-strong) focus:outline-none focus:[box-shadow:0_0_0_4px_rgba(15,78,201,0.15)]";
+
+const getApiErrorDetails = (err) => {
+  const status = Number(err?.response?.status || 0);
+  const payload = err?.response?.data || {};
+  const code = String(payload?.error?.code || payload?.code || "").trim();
+  const message = String(
+    payload?.message ||
+      payload?.error?.message ||
+      err?.message ||
+      "Registration failed"
+  ).trim();
+  return { status, code, message, payload };
+};
+
 function RegistrationFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [lang, setLang] = useState("en");
+  const [lang, setLang] = useAppLang(searchParams);
   const t = useTranslation(lang);
 
   const [mounted, setMounted] = useState(false);
@@ -61,11 +139,6 @@ function RegistrationFormContent() {
 
   useEffect(() => {
     setMounted(true);
-
-    const queryLang = String(searchParams?.get("lang") || "").trim().toLowerCase();
-    if (queryLang) {
-      setLang(queryLang);
-    }
 
     const fromOtp = getCookie("flow") === "otp_verified";
 
@@ -133,10 +206,39 @@ function RegistrationFormContent() {
     }
   }, [form.email, mounted]);
 
+  /* SeaNeB ID verified */
+  useEffect(() => {
+    if (!mounted) return;
+
+    const normalizedSeanebId = String(form.seanebId || "").trim().toLowerCase();
+    if (!normalizedSeanebId) {
+      setSeanebVerified(false);
+      return;
+    }
+
+    const verified = getCookie(SEANEB_VERIFIED_COOKIE) === "true";
+    const verifiedSeanebId = String(getCookie(VERIFIED_SEANEB_ID_COOKIE) || "")
+      .trim()
+      .toLowerCase();
+
+    if (verified && verifiedSeanebId === normalizedSeanebId) {
+      setSeanebVerified(true);
+      return;
+    }
+
+    setSeanebVerified(false);
+    if (verified || verifiedSeanebId) {
+      removeCookie(SEANEB_VERIFIED_COOKIE);
+      removeCookie(VERIFIED_SEANEB_ID_COOKIE);
+    }
+  }, [form.seanebId, mounted]);
+
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const hasEmail = String(form.email || "").trim().length > 0;
   const isValidEmail = emailRegex.test(form.email);
   const emailStepValid = !hasEmail || (isValidEmail && emailVerified);
+  const hasDob = String(form.dob || "").trim().length > 0;
+  const isDobEligible = isAtLeastAge(form.dob, MINIMUM_REGISTRATION_AGE);
 
   const isFormComplete =
     form.firstname &&
@@ -144,10 +246,27 @@ function RegistrationFormContent() {
     emailStepValid &&
     mobileVerified &&
     form.gender &&
-    form.dob &&
+    hasDob &&
+    isDobEligible &&
     form.hometown.place_id &&
     seanebVerified &&
     form.agree;
+
+  const submitBlockers = [];
+  if (!form.firstname) submitBlockers.push("First name is required.");
+  if (!form.lastname) submitBlockers.push("Last name is required.");
+  if (!mobileVerified) submitBlockers.push("Mobile number is not verified.");
+  if (!form.gender) submitBlockers.push("Gender is required.");
+  if (!hasDob) submitBlockers.push("Date of birth is required.");
+  if (hasDob && !isDobEligible)
+    submitBlockers.push("Minimum age is 13 years for registration.");
+  if (!form.hometown.place_id)
+    submitBlockers.push("Select hometown from suggestions.");
+  if (!seanebVerified)
+    submitBlockers.push("SeaNeB ID verification is required.");
+  if (!form.agree) submitBlockers.push("Accept terms and conditions.");
+  if (!emailStepValid)
+    submitBlockers.push("Verify email OTP or clear email field.");
 
   const handleChange = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -160,7 +279,26 @@ function RegistrationFormContent() {
 
     if (key === "seanebId") {
       setSeanebVerified(false);
+      removeCookie(SEANEB_VERIFIED_COOKIE);
+      removeCookie(VERIFIED_SEANEB_ID_COOKIE);
     }
+  };
+
+  const setSeanebVerification = (nextVerified) => {
+    const isVerified = Boolean(nextVerified);
+    setSeanebVerified(isVerified);
+
+    if (isVerified) {
+      const normalizedSeanebId = String(form.seanebId || "").trim().toLowerCase();
+      if (normalizedSeanebId) {
+        setCookie(SEANEB_VERIFIED_COOKIE, "true");
+        setCookie(VERIFIED_SEANEB_ID_COOKIE, normalizedSeanebId);
+        return;
+      }
+    }
+
+    removeCookie(SEANEB_VERIFIED_COOKIE);
+    removeCookie(VERIFIED_SEANEB_ID_COOKIE);
   };
 
   const handleHometownTyping = (text) => {
@@ -182,6 +320,45 @@ function RegistrationFormContent() {
     const mobileData = getVerifiedMobile();
     if (!mobileData) {
       alert("Mobile number not verified");
+      return;
+    }
+
+    // Signup API requires OTP verified with signup purpose (0).
+    const verifiedPurpose = Number(mobileData?.purpose ?? -1);
+    if (verifiedPurpose !== 0) {
+      const countryCode = String(mobileData?.country_code || "").trim();
+      const mobileNumber = String(mobileData?.mobile_number || "").trim();
+      if (!countryCode || !mobileNumber) {
+        alert("Mobile verification context is invalid. Please verify OTP again.");
+        return;
+      }
+
+      const otpContext = {
+        type: "mobile",
+        identifier_type: 0,
+        country_code: countryCode,
+        mobile_number: mobileNumber,
+        purpose: 0,
+        via: "whatsapp",
+        product_key: PRODUCT_KEY,
+      };
+
+      try {
+        setCookie("flow", "otp_verified");
+        setJsonCookie("reg_form_draft", form);
+        setJsonCookie("otp_context", otpContext);
+        setCookie("mobile_verified", "false");
+        removeCookie("verified_mobile");
+
+        await sendOtp(otpContext);
+        alert("Signup OTP sent. Please verify OTP to continue registration.");
+        router.push("/auth/otp");
+      } catch (otpErr) {
+        const details = getApiErrorDetails(otpErr);
+        const statusText = details.status ? ` [HTTP ${details.status}]` : "";
+        const codeText = details.code ? ` [${details.code}]` : "";
+        alert(`Unable to send signup OTP: ${details.message}${statusText}${codeText}`);
+      }
       return;
     }
 
@@ -214,7 +391,6 @@ function RegistrationFormContent() {
       ) {
         setSessionTokens({
           access_token: accessToken,
-          csrf_token: csrfToken,
         });
       }
 
@@ -228,23 +404,18 @@ function RegistrationFormContent() {
       removeCookie("reg_form_draft");
       removeCookie("email_verified");
       removeCookie("verified_email");
+      removeCookie(SEANEB_VERIFIED_COOKIE);
+      removeCookie(VERIFIED_SEANEB_ID_COOKIE);
       // Keep verified_mobile/otp_context so dealer business flow can re-send
       // mobile OTP with correct country code.
-      const redirectFromQuery = searchParams?.get("redirect_to");
-      const redirectFromCookie = getCookie("post_auth_redirect");
-      const postAuthRedirect =
-        getSafeInternalRedirectPath(redirectFromQuery) ||
-        getSafeInternalRedirectPath(redirectFromCookie);
-      if (postAuthRedirect) {
-        setCookie("post_auth_redirect", postAuthRedirect, { days: 1 });
-        router.push(
-          `/auth/success?lang=${lang}&redirect_to=${encodeURIComponent(postAuthRedirect)}`
-        );
-        return;
-      }
-      router.push(`/auth/success?lang=${lang}`);
+      removeCookie("post_auth_redirect");
+      router.push("/auth/success");
     } catch (err) {
-      alert(err?.response?.data?.message || "Registration failed" || response?.data?.error?.message);
+      const { status, code, message } = getApiErrorDetails(err);
+
+      const statusText = status ? ` [HTTP ${status}]` : "";
+      const codeText = code ? ` [${code}]` : "";
+      alert(`${message}${statusText}${codeText}`);
     } finally {
       setLoading(false);
     }
@@ -266,159 +437,203 @@ function RegistrationFormContent() {
       showBack={true}
       backFallback="/auth/otp"
     >
-      <h2 className="text-[26px] font-semibold text-black">{t.completeProfile}</h2>
-      <p className="mt-1.5 text-[14px] text-(--auth-muted)">{t.profileSubtitle}</p>
-
-      {/* First + Last */}
-      <div className="mb-5 mt-5.5 grid grid-cols-2 gap-5.5 [@media(max-width:640px)]:grid-cols-1">
-        <div className="min-w-0">
-          <label className="mb-1.5 block text-[14px] text-(--auth-field-label)">{t.firstname}</label>
-          <input
-            className="h-11 w-full rounded-[10px] border border-(--auth-border) px-3.5 py-3 text-[14px] text-black placeholder:text-(--auth-placeholder) focus:border-(--auth-border-strong) focus:outline-none"
-            value={form.firstname}
-            onChange={(e) =>
-              handleChange("firstname", e.target.value)
-            }
-          />
-        </div>
-
-        <div className="min-w-0">
-          <label className="mb-1.5 block text-[14px] text-(--auth-field-label)">{t.lastname}</label>
-          <input
-            className="h-11 w-full rounded-[10px] border border-(--auth-border) px-3.5 py-3 text-[14px] text-black placeholder:text-(--auth-placeholder) focus:border-(--auth-border-strong) focus:outline-none"
-            value={form.lastname}
-            onChange={(e) =>
-              handleChange("lastname", e.target.value)
-            }
-          />
-        </div>
+      <div className={REG_SECTION_CLASS}>
+        <h2 className="m-0 text-[30px] font-semibold leading-[1.1] tracking-[-0.02em] text-black [@media(max-width:640px)]:text-[26px]">
+          {t.completeProfile}
+        </h2>
+        <p className="mb-0 mt-2 text-[14px] text-(--auth-muted)">{t.profileSubtitle}</p>
       </div>
 
-      {/* Email + Gender */}
-      <div className="mb-5 mt-5.5 grid grid-cols-2 gap-5.5 [@media(max-width:640px)]:grid-cols-1">
-        <div className="min-w-0">
-          <label className="mb-1.5 block text-[14px] text-(--auth-field-label)">{t.email} (Optional)</label>
-          <div className="relative w-full">
+      <section className={`${REG_SECTION_CLASS} mt-4`}>
+        <div className="mb-3">
+          <h3 className="m-0 text-[15px] font-semibold text-[var(--color-text-primary)]">Personal details</h3>
+          <p className="mb-0 mt-1 text-[12px] text-[var(--color-text-muted)]">
+            Use your real details for profile verification.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-4 [@media(max-width:640px)]:grid-cols-1">
+          <div className="min-w-0">
+            <label className={REG_LABEL_CLASS}>{t.firstname}</label>
             <input
-              type="email"
-              className="h-11 w-full rounded-[10px] border border-(--auth-border) px-3.5 py-3 pr-22.5 text-[14px] text-black placeholder:text-(--auth-placeholder) focus:border-(--auth-border-strong) focus:outline-none"
-              value={form.email}
+              className={REG_INPUT_CLASS}
+              value={form.firstname}
               onChange={(e) =>
-                handleChange("email", e.target.value)
+                handleChange("firstname", e.target.value)
               }
             />
+          </div>
 
-            <button
-              type="button"
-              className={`absolute right-2.5 top-1/2 h-8 -translate-y-1/2 whitespace-nowrap rounded-md border px-3 text-[12px] ${
-                emailVerified
-                  ? "cursor-default border-(--color-success) bg-(--color-success) text-white"
-                  : "border-(--auth-border-light) bg-white text-black hover:bg-(--color-surface-muted)"
-              }`}
-              disabled={!isValidEmail || sendingOtp}
-              onClick={async () => {
-                try {
-                  setSendingOtp(true);
+          <div className="min-w-0">
+            <label className={REG_LABEL_CLASS}>{t.lastname}</label>
+            <input
+              className={REG_INPUT_CLASS}
+              value={form.lastname}
+              onChange={(e) =>
+                handleChange("lastname", e.target.value)
+              }
+            />
+          </div>
 
-                  setCookie("flow", "otp_verified");
-                  setJsonCookie("otp_context", {
-                    type: "email",
-                    email: form.email,
-                    purpose: 1,
-                  });
+          <div className="min-w-0">
+            <label className={REG_LABEL_CLASS}>{t.gender}</label>
+            <CustomDropdown
+              value={form.gender}
+              onChange={(val) =>
+                handleChange("gender", val)
+              }
+              options={GENDER_OPTIONS}
+              placeholder={t.select}
+            />
+          </div>
 
-                  await sendEmailOtp({ email: form.email, purpose: 1 });
-                  router.push(`/auth/otp?type=email&lang=${lang}`);
-                } finally {
-                  setSendingOtp(false);
-                }
-              }}
-            >
-              {emailVerified ? "Verified" : "Verify"}
-            </button>
+          <div className="min-w-0">
+            <label className={REG_LABEL_CLASS}>{t.dob}</label>
+            <DatePicker
+              value={form.dob}
+              onChange={(val) =>
+                handleChange("dob", val)
+              }
+            />
+            {hasDob && !isDobEligible && (
+              <p className="mt-1.5 text-[12px] text-[#d93025]">
+                You must be at least 13 years old to register.
+              </p>
+            )}
           </div>
         </div>
-        <div className="min-w-0">
-          <label className="mb-1.5 block text-[14px] text-(--auth-field-label)">{t.gender}</label>
-          <CustomDropdown
-            value={form.gender}
-            onChange={(val) =>
-              handleChange("gender", val)
-            }
-            options={GENDER_OPTIONS}
-            placeholder={t.select}
-          />
+      </section>
+
+      <section className={`${REG_SECTION_CLASS} mt-4`}>
+        <div className="mb-3">
+          <h3 className="m-0 text-[15px] font-semibold text-[var(--color-text-primary)]">Contact details</h3>
+          <p className="mb-0 mt-1 text-[12px] text-[var(--color-text-muted)]">
+            Email is optional but should be verified if provided.
+          </p>
         </div>
-      </div>
+        <div className="grid grid-cols-2 gap-4 [@media(max-width:640px)]:grid-cols-1">
+          <div className="min-w-0">
+            <label className={REG_LABEL_CLASS}>
+              {String(t.email || "Email").replace(/\s*\*+\s*$/, "")} (Optional)
+            </label>
+            <div className="relative w-full">
+              <input
+                type="email"
+                className={`${REG_INPUT_CLASS} pr-22.5`}
+                value={form.email}
+                onChange={(e) =>
+                  handleChange("email", e.target.value)
+                }
+              />
 
-      {/* Hometown */}
-      <div className="mb-5 mt-5.5 grid grid-cols-2 gap-5.5 [@media(max-width:640px)]:grid-cols-1">
-        <div className="min-w-0">
-          <label className="mb-1.5 block text-[14px] text-(--auth-field-label)">{t.hometown}</label>
-          <AutoComplete
-            value={form.hometown.label}
-            onChange={(val) =>
-              typeof val === "string"
-                ? handleHometownTyping(val)
-                : handleChange("hometown", val)
-            }
-          />
+              <button
+                type="button"
+                className={`absolute right-2.5 top-1/2 h-8 -translate-y-1/2 whitespace-nowrap rounded-md border px-3 text-[12px] font-medium ${
+                  emailVerified
+                    ? "cursor-default border-(--color-success) bg-(--color-success) text-white"
+                    : "border-(--auth-border-light) bg-white text-black hover:bg-(--color-surface-muted)"
+                }`}
+                disabled={!isValidEmail || sendingOtp}
+                onClick={async () => {
+                  try {
+                    setSendingOtp(true);
+                    const email = String(form.email || "").trim();
+                    await sendEmailOtp({ email, purpose: 1 });
+
+                    setCookie("flow", "otp_verified");
+                    setJsonCookie("otp_context", {
+                      type: "email",
+                      email,
+                      purpose: 1,
+                    });
+                    router.push("/auth/otp?type=email");
+                  } catch (err) {
+                    const message =
+                      err?.response?.data?.message ||
+                      err?.response?.data?.error?.message ||
+                      "Failed to send email OTP";
+                    alert(message);
+                  } finally {
+                    setSendingOtp(false);
+                  }
+                }}
+              >
+                {emailVerified ? "Verified" : "Verify"}
+              </button>
+            </div>
+          </div>
+
+          <div className="min-w-0">
+            <label className={REG_LABEL_CLASS}>{t.hometown}</label>
+            <AutoComplete
+              value={form.hometown.label}
+              onChange={(val) =>
+                typeof val === "string"
+                  ? handleHometownTyping(val)
+                  : handleChange("hometown", val)
+              }
+            />
+          </div>
         </div>
+      </section>
 
-        <div className="min-w-0">
-          <label className="mb-1.5 block text-[14px] text-(--auth-field-label)">{t.dob}</label>
-          <DatePicker
-            value={form.dob}
-            onChange={(val) =>
-              handleChange("dob", val)
-            }
-          />
+      <section className={`${REG_SECTION_CLASS} mt-4`}>
+        <div className="mb-3">
+          <h3 className="m-0 text-[15px] font-semibold text-[var(--color-text-primary)]">Account ID</h3>
+          <p className="mb-0 mt-1 text-[12px] text-[var(--color-text-muted)]">
+            Choose and verify your SeaNeB ID before submitting.
+          </p>
         </div>
-      </div>
-
-      <SeanebIdField
-        value={form.seanebId}
-        onChange={(val) =>
-          handleChange("seanebId", val)
-        }
-        verified={seanebVerified}
-        setVerified={setSeanebVerified}
-        label={t.seanebIdLabel || "SeaNeB ID *"}
-        placeholder={t.seanebIdPlaceholder || "username01"}
-        verifyLabel={t.seanebIdVerifyLabel || t.verify || "Verify"}
-        checkingLabel={t.seanebIdCheckingLabel || t.verifying || "Checking..."}
-        verifiedLabel={`${t.seanebIdVerifiedLabel || t.verified || "Verified"} \u2713`}
-        editLabel={t.seanebIdEdit || "Edit SeaNeB ID"}
-        formatHint={
-          t.seanebIdFormatHelper ||
-          "6-30 characters. Lowercase letters, numbers, and hyphen (-) only."
-        }
-        verifiedMessage={t.seanebIdVerifiedMessage || "SeaNeB ID verified."}
-        existsMessage={t.seanebIdExistsMessage || "SeaNeB ID already exists."}
-        invalidMessage={t.seanebIdInvalidMessage || "Invalid SeaNeB ID format."}
-        verifyFailedMessage={t.seanebIdVerifyFailedMessage || "Unable to verify SeaNeB ID."}
-        verifyRequiredMessage={
-          t.seanebIdVerifyRequired || "Verify SeaNeB ID before submission."
-        }
-      />
-
-      <label className="mt-5.5 flex gap-2.5 text-[14px] text-(--auth-field-label)">
-        <input
-          type="checkbox"
-          checked={form.agree}
-          onChange={(e) =>
-            handleChange("agree", e.target.checked)
+        <SeanebIdField
+          value={form.seanebId}
+          onChange={(val) =>
+            handleChange("seanebId", val)
+          }
+          verified={seanebVerified}
+          setVerified={setSeanebVerification}
+          label={t.seanebIdLabel || "SeaNeB ID *"}
+          placeholder={t.seanebIdPlaceholder || "username01"}
+          verifyLabel={t.seanebIdVerifyLabel || t.verify || "Verify"}
+          checkingLabel={t.seanebIdCheckingLabel || t.verifying || "Checking..."}
+          verifiedLabel={`${t.seanebIdVerifiedLabel || t.verified || "Verified"} \u2713`}
+          editLabel={t.seanebIdEdit || "Edit SeaNeB ID"}
+          formatHint={
+            t.seanebIdFormatHelper ||
+            "6-30 characters. Lowercase letters, numbers, and hyphen (-) only."
+          }
+          verifiedMessage={t.seanebIdVerifiedMessage || "SeaNeB ID verified."}
+          existsMessage={t.seanebIdExistsMessage || "SeaNeB ID already exists."}
+          invalidMessage={t.seanebIdInvalidMessage || "Invalid SeaNeB ID format."}
+          verifyFailedMessage={t.seanebIdVerifyFailedMessage || "Unable to verify SeaNeB ID."}
+          verifyRequiredMessage={
+            t.seanebIdVerifyRequired || "Verify SeaNeB ID before submission."
           }
         />
-        {t.terms}
-      </label>
+      </section>
 
-      <PrimaryButton
-        disabled={!isFormComplete || loading}
-        onClick={handleSubmit}
-      >
-        {loading ? "Please wait..." : t.submit}
-      </PrimaryButton>
+      <div className={`${REG_SECTION_CLASS} mt-4`}>
+        <label className="flex gap-2.5 text-[14px] text-(--auth-field-label)">
+          <input
+            type="checkbox"
+            className="mt-[2px] h-4 w-4"
+            checked={form.agree}
+            onChange={(e) =>
+              handleChange("agree", e.target.checked)
+            }
+          />
+          {t.terms}
+        </label>
+
+        <PrimaryButton
+          className="mt-4"
+          disabled={!isFormComplete || loading}
+          onClick={handleSubmit}
+        >
+          {loading ? "Please wait..." : t.submit}
+        </PrimaryButton>
+        {!isFormComplete && submitBlockers.length > 0 && (
+          <p className="mt-2 text-[12px] text-[#d93025]">{submitBlockers[0]}</p>
+        )}
+      </div>
     </AuthLayout>
   );
 }

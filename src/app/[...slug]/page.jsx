@@ -1,4 +1,4 @@
-﻿import { redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 
 const toQueryString = (searchParams) => {
   const entries = Object.entries(searchParams || {}).flatMap(([key, value]) => {
@@ -17,7 +17,7 @@ const toQueryString = (searchParams) => {
 
 export default async function LegacyListingRedirect({ params, searchParams }) {
   const webAppUrl = String(
-    process.env.NEXT_PUBLIC_WEB_APP_URL || "http://localhost:1003"
+    process.env.NEXT_PUBLIC_WEB_APP_URL || ""
   ).replace(/\/$/, "");
 
   const resolvedParams = await params;

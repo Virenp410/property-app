@@ -1,34 +1,37 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
-import countries from "@/app/constant/country.json";
-import AuthLayout from "@/app/component/AuthLayout";
-import AutoComplete from "@/app/component/AutoComplete";
-import PrimaryButton from "@/app/component/PrimaryButton";
-import useTranslation from "@/app/hook/useTranslation";
-import useDebounce from "@/app/hook/useDebaunce";
-import api from "@/app/services/api";
-import { sendEmailOtp, sendOtp, verifyEmailOtp } from "@/app/services/otp.services";
+import countries from "@/constants/country.json";
+import AuthLayout from "@/components/AuthLayout";
+import AutoComplete from "@/components/AutoComplete";
+import PrimaryButton from "@/components/PrimaryButton";
+import OtpInput from "@/components/OtpInput";
+import useTranslation from "@/hooks/useTranslation";
+import useAppLang from "@/hooks/useAppLang";
+import useDebounce from "@/hooks/useDebaunce";
+import useOtp from "@/hooks/useOtp";
+import api from "@/services/api";
+import { sendEmailOtp, sendOtp } from "@/services/otp.services";
 import {
-  ensureDefaultProductAuto,
   getBusinessAutocomplete,
   registerBusiness,
   verifyPanForBranch as verifyPan,
   verifyGstForBranch as verifyGstin,
-} from "@/app/services/business.services";
-import { checkSeanebId } from "@/app/services/auth.services";
-import { getCategories } from "@/app/services/category.services";
+} from "@/services/business.services";
+import { checkSeanebId } from "@/services/auth.services";
+import { getCategories } from "@/services/category.services";
 import {
   getCookie,
   setCookie,
   removeCookie,
   getJsonCookie,
   setJsonCookie,
-} from "@/app/services/cookieStore";
-import { PRODUCT_KEY } from "@/app/services/productKey";
+} from "@/services/cookieStore";
+import { PRODUCT_KEY } from "@/lib/productKey";
+import { notifyParentAndClose } from "@/lib/auth/popupAuthBridge";
 
 const EMPTY_FORM = {
   country_code: "91",
@@ -40,8 +43,6 @@ const EMPTY_FORM = {
   whatsapp_number: "",
   business_email: "",
   about_branch: "",
-  address: "",
-  landmark: "",
   place: { label: "", place_id: null },
   pan_number: "",
   gstin: "",
@@ -56,12 +57,40 @@ const AUTO_BUSINESS_TYPE_OPTIONS = [
   { value: "3", label: "Multi-Brand Auto Hub" },
 ];
 
-const MIN_BUSINESS_AUTOCOMPLETE_CHARS = 3;
+const WIZARD_STEPS = [
+  {
+    id: 1,
+    title: "Business Identity",
+    subtitle: "Business name, category and SeaNeB branch ID verification.",
+  },
+  {
+    id: 2,
+    title: "Contact Information",
+    subtitle: "Primary mobile verification and optional business email OTP.",
+  },
+  {
+    id: 3,
+    title: "Location Details",
+    subtitle: "Business location and branch summary for customer discovery.",
+  },
+  {
+    id: 4,
+    title: "Compliance & Submit",
+    subtitle: "Optional PAN/GST checks and final terms agreement.",
+  },
+];
+
+const MIN_BUSINESS_AUTOCOMPLETE_CHARS = 2;
 const normalizeBusinessLabel = (value) =>
   String(value || "")
     .split(",")[0]
     .trim()
     .slice(0, 30);
+const isManualDisplayName = (displayName, businessName) => {
+  const currentDisplayName = String(displayName || "").trim();
+  if (!currentDisplayName) return false;
+  return currentDisplayName !== normalizeBusinessLabel(businessName);
+};
 const getErrorMessage = (err, fallback) =>
   err?.response?.data?.error?.message ||
   err?.response?.data?.message ||
@@ -77,32 +106,44 @@ const getCountryByCode = (code) => {
 };
 
 const BIZ_INPUT_CLASS =
-  "h-[46px] w-full rounded-[11px] border border-[#d9e1ec] bg-[var(--color-white)] px-[14px] text-[14px] text-[var(--color-text-primary)] placeholder:text-[#94a3b8] transition-[border-color,box-shadow,transform] duration-200 ease-in-out focus:border-[#0f4ec9] focus:outline-none focus:[box-shadow:0_0_0_4px_rgba(15,78,201,0.18)]";
+  "h-[48px] w-full rounded-[12px] border border-[#c6d6ea] bg-[var(--color-white)] px-[14px] text-[14px] text-[var(--color-text-primary)] placeholder:text-[#91a6c4] transition-[border-color,box-shadow,transform] duration-200 ease-in-out focus:border-[#0f4ec9] focus:outline-none focus:[box-shadow:0_0_0_4px_rgba(15,78,201,0.16)]";
 const BIZ_TEXTAREA_CLASS =
-  "h-auto min-h-[112px] w-full resize-y rounded-[11px] border border-[#d9e1ec] bg-[var(--color-white)] px-[14px] py-[11px] text-[14px] leading-[1.5] text-[var(--color-text-primary)] placeholder:text-[#94a3b8] transition-[border-color,box-shadow,transform] duration-200 ease-in-out focus:border-[#0f4ec9] focus:outline-none focus:[box-shadow:0_0_0_4px_rgba(15,78,201,0.18)]";
+  "h-auto min-h-[116px] w-full resize-y rounded-[12px] border border-[#c6d6ea] bg-[var(--color-white)] px-[14px] py-[11px] text-[14px] leading-[1.5] text-[var(--color-text-primary)] placeholder:text-[#91a6c4] transition-[border-color,box-shadow,transform] duration-200 ease-in-out focus:border-[#0f4ec9] focus:outline-none focus:[box-shadow:0_0_0_4px_rgba(15,78,201,0.16)]";
 const BIZ_AUTOCOMPLETE_WRAPPER_CLASS = "relative";
 const BIZ_SUGGESTION_BOX_CLASS =
-  "absolute left-0 top-full z-[60] max-h-[200px] w-full overflow-y-auto rounded-b-[10px] border border-t-0 border-[#d9e1ec] bg-[var(--color-white)] shadow-[0_14px_28px_rgba(15,23,42,0.12)]";
+  "absolute left-0 top-full z-[60] max-h-[220px] w-full overflow-y-auto rounded-b-[12px] border border-t-0 border-[#c6d6ea] bg-[var(--color-white)] shadow-[0_16px_30px_rgba(15,42,85,0.18)]";
 const BIZ_SUGGESTION_ITEM_CLASS =
   "cursor-pointer px-[14px] py-[10px] text-[14px] text-[var(--color-text-heading)] hover:bg-[var(--color-surface-muted)]";
 const BIZ_VERIFY_WRAPPER_CLASS = "relative w-full";
 const BIZ_VERIFY_BUTTON_BASE_CLASS =
-  "absolute right-[10px] top-1/2 h-8 -translate-y-1/2 whitespace-nowrap rounded-[6px] border border-[var(--auth-border-light)] bg-[var(--color-white)] px-3 text-[12px] text-[var(--color-black)] transition-colors duration-200 ease-in-out hover:bg-[var(--color-surface-muted)] disabled:cursor-not-allowed disabled:opacity-60";
+  "absolute right-[10px] top-1/2 h-8 -translate-y-1/2 whitespace-nowrap rounded-[8px] border border-[#9cb6d7] bg-[linear-gradient(180deg,#ffffff_0%,#f0f6ff_100%)] px-3 text-[12px] font-semibold text-[#164795] transition-[border-color,background-color,transform] duration-200 ease-in-out hover:border-[#7ea0cb] hover:bg-[#e9f2ff] disabled:cursor-not-allowed disabled:opacity-60";
 const BIZ_VERIFY_BUTTON_VERIFIED_CLASS =
   "absolute right-[10px] top-1/2 h-8 -translate-y-1/2 cursor-default whitespace-nowrap rounded-[6px] border border-[var(--color-success)] bg-[var(--color-success)] px-3 text-[12px] text-[var(--color-white)]";
-const BIZ_VERIFY_OTP_ROW_CLASS =
-  "mt-[10px] grid grid-cols-[1fr_120px] gap-2 [@media(max-width:640px)]:grid-cols-1";
-const BIZ_VERIFY_OTP_BUTTON_CLASS =
-  "h-[44px] cursor-pointer rounded-[10px] border border-[#0f4ec9] bg-[var(--color-btn-secondary-hover)] text-[13px] font-semibold text-[#0f4ec9] disabled:cursor-not-allowed disabled:opacity-60";
+const BIZ_SECTION_CLASS =
+  "rounded-[18px] border border-[#d5e1f0] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)] p-[20px] shadow-[0_14px_28px_rgba(15,42,85,0.08)]";
 const BIZ_HELPER_CLASS = "mt-[7px] text-[12px] text-[var(--color-text-muted)]";
 const BIZ_HELPER_ERROR_CLASS =
   "mt-[7px] text-[12px] font-medium text-[var(--color-danger)]";
 const BIZ_HELPER_SUCCESS_CLASS =
   "mt-[7px] text-[12px] text-[var(--color-success-strong)]";
+const BUSINESS_SEANEB_VERIFIED_COOKIE = "business_seaneb_id_verified";
+const VERIFIED_BUSINESS_SEANEB_ID_COOKIE = "verified_business_seaneb_id";
 
 export default function BusinessRegistrationPage() {
+  return (
+    <Suspense fallback={null}>
+      <BusinessRegistrationPageContent />
+    </Suspense>
+  );
+}
+
+function BusinessRegistrationPageContent() {
   const router = useRouter();
-  const [lang, setLang] = useState("en");
+  const searchParams = useSearchParams();
+  const webAppUrl = String(
+    process.env.NEXT_PUBLIC_WEB_APP_URL || ""
+  ).replace(/\/$/, "");
+  const [lang, setLang] = useAppLang(searchParams);
   const t = useTranslation(lang);
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
@@ -113,13 +154,12 @@ export default function BusinessRegistrationPage() {
   const [businessLoading, setBusinessLoading] = useState(false);
   const [businessSuggestionError, setBusinessSuggestionError] = useState("");
   const [businessFetchedOnce, setBusinessFetchedOnce] = useState(false);
-  const [emailOtp, setEmailOtp] = useState("");
-  const [emailOtpSent, setEmailOtpSent] = useState(false);
   const [emailVerified, setEmailVerified] = useState(false);
   const [mobileVerified, setMobileVerified] = useState(false);
+  const [whatsappVerified, setWhatsappVerified] = useState(false);
   const [sendingMobileOtp, setSendingMobileOtp] = useState(false);
+  const [sendingWhatsappOtp, setSendingWhatsappOtp] = useState(false);
   const [sendingEmailOtp, setSendingEmailOtp] = useState(false);
-  const [verifyingEmailOtp, setVerifyingEmailOtp] = useState(false);
   const [panVerified, setPanVerified] = useState(false);
   const [gstVerified, setGstVerified] = useState(false);
   const [verifyingPan, setVerifyingPan] = useState(false);
@@ -136,10 +176,46 @@ export default function BusinessRegistrationPage() {
   const [businessCheckDone, setBusinessCheckDone] = useState(false);
   const [country, setCountry] = useState(() => getCountryByCode("91"));
   const [showCountries, setShowCountries] = useState(false);
+  const [displayNameManuallyEdited, setDisplayNameManuallyEdited] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [mobileOtpVia, setMobileOtpVia] = useState("whatsapp");
+  const [whatsappOtpVia, setWhatsappOtpVia] = useState("whatsapp");
+  const [otpModalOpen, setOtpModalOpen] = useState(false);
+  const [otpModalType, setOtpModalType] = useState("mobile");
+  const [otpTargetLabel, setOtpTargetLabel] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [otpResetKey, setOtpResetKey] = useState(0);
+  const [showOtpResendOptions, setShowOtpResendOptions] = useState(false);
   const submitLockRef = useRef(false);
   const businessAutocompleteRef = useRef(null);
   const countryDropdownRef = useRef(null);
   const debouncedBusinessName = useDebounce(form.business_name, 350);
+
+  const handoffToListingDealerDash = useCallback(() => {
+    const authOrigin =
+      typeof window !== "undefined"
+        ? window.location.origin
+        : String(process.env.NEXT_PUBLIC_AUTH_APP_URL || "").replace(/\/$/, "");
+    const listingDealerDash = `${authOrigin}/auth/dealerdash`;
+    const handedOff = notifyParentAndClose({
+      status: "dealer_registered",
+      returnTo: listingDealerDash,
+    });
+    if (handedOff) return;
+
+    if (typeof window !== "undefined") {
+      window.location.href = listingDealerDash;
+      return;
+    }
+    router.replace(listingDealerDash);
+  }, [router]);
+
+  useEffect(() => {
+    const hasReturnTo = Boolean(searchParams?.get("return_to"));
+    const hasReturnOrigin = Boolean(searchParams?.get("return_origin"));
+    if (!hasReturnTo && !hasReturnOrigin) return;
+    router.replace("/auth/business-reg");
+  }, [router, searchParams]);
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const phoneRegex = /^\d{10,15}$/;
@@ -147,11 +223,17 @@ export default function BusinessRegistrationPage() {
   const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
   const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
   const isValidEmail = emailRegex.test(form.business_email);
-  const isValidPrimaryNumber = phoneRegex.test(form.primary_number.trim());
+  const primaryNumber = form.primary_number.trim();
+  const whatsappNumber = form.whatsapp_number.trim();
+  const isValidPrimaryNumber = phoneRegex.test(primaryNumber);
   const hasBusinessEmail = String(form.business_email || "").trim().length > 0;
   const isValidSeaneb = seanebRegex.test(form.seaneb_id.trim());
-  const isValidWhatsapp =
-    !form.whatsapp_number.trim() || phoneRegex.test(form.whatsapp_number.trim());
+  const isValidWhatsapp = !whatsappNumber || phoneRegex.test(whatsappNumber);
+  const hasWhatsappNumber = Boolean(whatsappNumber);
+  const isWhatsappDifferentFromPrimary =
+    hasWhatsappNumber && whatsappNumber !== primaryNumber;
+  const requiresWhatsappVerification = isWhatsappDifferentFromPrimary;
+  const isWhatsappStepValid = !requiresWhatsappVerification || whatsappVerified;
   const hasBranchSummary = form.about_branch.trim().length >= 20;
   const hasPan = form.pan_number.trim().length > 0;
   const hasGstin = form.gstin.trim().length > 0;
@@ -171,7 +253,6 @@ export default function BusinessRegistrationPage() {
     isValidPrimaryNumber,
     mobileVerified,
     isBusinessEmailStepValid,
-    form.address.trim(),
     form.place.place_id,
     form.main_category_id,
     form.agree,
@@ -190,20 +271,131 @@ export default function BusinessRegistrationPage() {
     isValidPrimaryNumber &&
     mobileVerified &&
     isValidWhatsapp &&
+    isWhatsappStepValid &&
     isBusinessEmailStepValid &&
     hasBranchSummary &&
-    form.address.trim() &&
     form.place.place_id &&
     form.main_category_id &&
     isPanFormatValid &&
     isGstinFormatValid &&
     form.agree;
 
+  const isIdentityStepComplete =
+    form.business_name.trim() &&
+    form.display_name.trim() &&
+    form.business_type !== "" &&
+    form.main_category_id &&
+    form.seaneb_id.trim() &&
+    seanebVerified;
+
+  const isContactStepComplete =
+    isValidPrimaryNumber &&
+    mobileVerified &&
+    isValidWhatsapp &&
+    isWhatsappStepValid &&
+    isBusinessEmailStepValid;
+
+  const isLocationStepComplete =
+    Boolean(form.place.place_id) && hasBranchSummary;
+
+  const isComplianceStepComplete =
+    isPanFormatValid && isGstinFormatValid;
+
+  const {
+    verify: verifyInlineOtp,
+    resend: resendInlineOtp,
+    loading: verifyingInlineOtp,
+    resending: resendingInlineOtp,
+    infoMessage: inlineOtpInfoMessage,
+    cooldown: inlineOtpCooldown,
+    isEmail: inlineOtpIsEmail,
+  } = useOtp({
+    t,
+    onSuccess: () => {
+      if (otpModalType === "mobile") {
+        setMobileVerified(true);
+        setSuccessMessage("Primary number verified successfully.");
+      } else if (otpModalType === "whatsapp") {
+        setWhatsappVerified(true);
+        setCookie("business_whatsapp_verified", "true");
+        setCookie("verified_business_whatsapp", whatsappNumber);
+        setSuccessMessage("WhatsApp number verified successfully.");
+      } else {
+        setEmailVerified(true);
+        setSuccessMessage("Business email verified successfully.");
+      }
+      setErrorMessage("");
+      setOtpModalOpen(false);
+      setOtpCode("");
+      setShowOtpResendOptions(false);
+      setOtpResetKey((prev) => prev + 1);
+    },
+  });
+
+  const stepCompletionMap = {
+    1: Boolean(isIdentityStepComplete),
+    2: Boolean(isContactStepComplete),
+    3: Boolean(isLocationStepComplete),
+    4: Boolean(isComplianceStepComplete),
+  };
+
+  const currentStepMeta = WIZARD_STEPS.find((step) => step.id === currentStep) || WIZARD_STEPS[0];
+
+  const unlockedStepFromProgress = !isIdentityStepComplete
+    ? 1
+    : !isContactStepComplete
+    ? 2
+    : !isLocationStepComplete
+    ? 3
+    : 4;
+
+  const maxReachableStep = Math.max(currentStep, unlockedStepFromProgress);
+
+  const getStepValidationError = (stepId) => {
+    if (stepId === 1 && !isIdentityStepComplete) {
+      return "Complete business identity details and verify SeaNeB Branch ID to continue.";
+    }
+    if (stepId === 2 && !isContactStepComplete) {
+      return "Verify primary mobile and complete contact details to continue.";
+    }
+    if (stepId === 3 && !isLocationStepComplete) {
+      return "Select place and write about your business to continue.";
+    }
+    if (stepId === 4 && !isComplianceStepComplete) {
+      return "Check PAN/GST formats before submitting.";
+    }
+    return "";
+  };
+
+  const goToStep = (targetStep) => {
+    const next = Number(targetStep);
+    if (!Number.isFinite(next)) return;
+    if (next < 1 || next > WIZARD_STEPS.length) return;
+    if (next > maxReachableStep) return;
+    setErrorMessage("");
+    setCurrentStep(next);
+  };
+
+  const handlePreviousStep = () => {
+    if (currentStep <= 1 || loading) return;
+    setErrorMessage("");
+    setCurrentStep((prev) => Math.max(1, prev - 1));
+  };
+
+  const handleNextStep = () => {
+    if (currentStep >= WIZARD_STEPS.length || loading) return;
+    const validationError = getStepValidationError(currentStep);
+    if (validationError) {
+      setErrorMessage(validationError);
+      return;
+    }
+    setErrorMessage("");
+    setCurrentStep((prev) => Math.min(WIZARD_STEPS.length, prev + 1));
+  };
+
   const handleChange = (key, value) => {
     if (key === "business_email") {
       setEmailVerified(false);
-      setEmailOtpSent(false);
-      setEmailOtp("");
       removeCookie("business_email_verified");
       removeCookie("verified_business_email");
     }
@@ -223,14 +415,44 @@ export default function BusinessRegistrationPage() {
       }
     }
 
+    if (key === "whatsapp_number") {
+      setWhatsappVerified(false);
+      if (typeof window !== "undefined") {
+        removeCookie("business_whatsapp_verified");
+        removeCookie("verified_business_whatsapp");
+      }
+    }
+
     if (key === "seaneb_id") {
       setSeanebVerified(false);
       setEditingSeanebId(true);
       setSeanebIdMessage("");
       setSeanebIdMessageType("");
+      removeCookie(BUSINESS_SEANEB_VERIFIED_COOKIE);
+      removeCookie(VERIFIED_BUSINESS_SEANEB_ID_COOKIE);
     }
 
-    setForm((prev) => ({ ...prev, [key]: value }));
+    setForm((prev) => {
+      if (key === "business_name") {
+        const nextBusinessName = String(value || "");
+        const currentDisplayName = String(prev.display_name || "").trim();
+        const previousAutoDisplayName = normalizeBusinessLabel(prev.business_name);
+        const shouldSyncDisplayName =
+          !displayNameManuallyEdited ||
+          !currentDisplayName ||
+          currentDisplayName === previousAutoDisplayName;
+
+        return {
+          ...prev,
+          business_name: nextBusinessName,
+          ...(shouldSyncDisplayName
+            ? { display_name: normalizeBusinessLabel(nextBusinessName) }
+            : {}),
+        };
+      }
+
+      return { ...prev, [key]: value };
+    });
   };
 
   useEffect(() => {
@@ -239,19 +461,38 @@ export default function BusinessRegistrationPage() {
     try {
       const parsed = getJsonCookie("business_reg_draft");
       if (parsed && typeof parsed === "object") {
+        const {
+          display_name_manually_edited: parsedDisplayNameManuallyEdited,
+          current_step: parsedCurrentStep,
+          ...parsedForm
+        } = parsed;
+
         setForm((prev) => ({
           ...prev,
-          ...parsed,
+          ...parsedForm,
           country_code:
-            normalizeCountryCode(parsed?.country_code) || prev.country_code,
+            normalizeCountryCode(parsedForm?.country_code) || prev.country_code,
           place:
-            parsed?.place && typeof parsed.place === "object"
-              ? parsed.place
+            parsedForm?.place && typeof parsedForm.place === "object"
+              ? parsedForm.place
               : prev.place,
         }));
+        setDisplayNameManuallyEdited(
+          typeof parsedDisplayNameManuallyEdited === "boolean"
+            ? parsedDisplayNameManuallyEdited
+            : false
+        );
 
-        const draftCountry = getCountryByCode(parsed?.country_code);
+        const draftCountry = getCountryByCode(parsedForm?.country_code);
         setCountry(draftCountry);
+        const stepFromDraft = Number(parsedCurrentStep || 1);
+        if (
+          Number.isFinite(stepFromDraft) &&
+          stepFromDraft >= 1 &&
+          stepFromDraft <= WIZARD_STEPS.length
+        ) {
+          setCurrentStep(stepFromDraft);
+        }
         return;
       }
 
@@ -261,6 +502,7 @@ export default function BusinessRegistrationPage() {
         setCountry(getCountryByCode(verifiedCountryCode));
         setForm((prev) => ({ ...prev, country_code: verifiedCountryCode }));
       }
+      setDisplayNameManuallyEdited(false);
     } catch {
       // ignore malformed draft
     }
@@ -296,6 +538,101 @@ export default function BusinessRegistrationPage() {
       setMobileVerified(false);
     }
   }, [form.primary_number, form.country_code]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const whatsapp = String(form.whatsapp_number || "").trim();
+    const primary = String(form.primary_number || "").trim();
+    const selectedCountryCode = normalizeCountryCode(form.country_code);
+
+    if (!whatsapp || whatsapp === primary) {
+      setWhatsappVerified(false);
+      return;
+    }
+
+    if (!/^\d{10,15}$/.test(whatsapp)) {
+      setWhatsappVerified(false);
+      return;
+    }
+
+    try {
+      const verified = getJsonCookie("verified_mobile");
+      const verifiedNumber = String(verified?.mobile_number || "").trim();
+      const verifiedPurpose = Number(verified?.purpose ?? 0);
+      const verifiedCountryCode = normalizeCountryCode(verified?.country_code);
+      const whatsappVerifiedFlag = getCookie("business_whatsapp_verified") === "true";
+      const verifiedWhatsapp = String(getCookie("verified_business_whatsapp") || "").trim();
+
+      setWhatsappVerified(
+        Boolean(
+          whatsappVerifiedFlag &&
+            verifiedWhatsapp &&
+            verifiedWhatsapp === whatsapp &&
+            verifiedNumber === whatsapp &&
+            verifiedPurpose === 2 &&
+            (!selectedCountryCode || verifiedCountryCode === selectedCountryCode)
+        )
+      );
+    } catch {
+      setWhatsappVerified(false);
+    }
+  }, [form.whatsapp_number, form.primary_number, form.country_code]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const email = String(form.business_email || "").trim();
+    if (!email) {
+      setEmailVerified(false);
+      return;
+    }
+
+    const verified = getCookie("business_email_verified") === "true";
+    const verifiedEmail = String(getCookie("verified_business_email") || "").trim();
+    const matchesVerifiedEmail =
+      verified &&
+      verifiedEmail &&
+      verifiedEmail.toLowerCase() === email.toLowerCase();
+
+    if (matchesVerifiedEmail) {
+      setEmailVerified(true);
+      return;
+    }
+
+    if (!verified) {
+      setEmailVerified(false);
+    }
+  }, [form.business_email]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const normalizedSeanebId = String(form.seaneb_id || "").trim().toLowerCase();
+    if (!normalizedSeanebId) {
+      setSeanebVerified(false);
+      setEditingSeanebId(true);
+      return;
+    }
+
+    const verified = getCookie(BUSINESS_SEANEB_VERIFIED_COOKIE) === "true";
+    const verifiedSeanebId = String(getCookie(VERIFIED_BUSINESS_SEANEB_ID_COOKIE) || "")
+      .trim()
+      .toLowerCase();
+
+    if (verified && verifiedSeanebId === normalizedSeanebId) {
+      setSeanebVerified(true);
+      setEditingSeanebId(false);
+      return;
+    }
+
+    setSeanebVerified(false);
+    setEditingSeanebId(true);
+    if (verified || verifiedSeanebId) {
+      removeCookie(BUSINESS_SEANEB_VERIFIED_COOKIE);
+      removeCookie(VERIFIED_BUSINESS_SEANEB_ID_COOKIE);
+    }
+  }, [form.seaneb_id]);
 
   const handlePlaceChange = (value) => {
     if (typeof value === "string") {
@@ -341,7 +678,7 @@ export default function BusinessRegistrationPage() {
 
         if (profileRegistered) {
           setCookie("dashboard_mode", "dealer", { days: 365 });
-          router.replace("/auth/dealerdash");
+          handoffToListingDealerDash();
         }
       } catch (err) {
         if (Number(err?.response?.status || 0) === 401) {
@@ -357,25 +694,7 @@ export default function BusinessRegistrationPage() {
     return () => {
       active = false;
     };
-  }, [router]);
-
-  useEffect(() => {
-    let active = true;
-    const ensureDefaultProduct = async () => {
-      try {
-        await ensureDefaultProductAuto();
-      } catch {
-        // Silent by design: we keep default "auto" in payload and avoid noisy UI errors.
-      } finally {
-        if (!active) return;
-      }
-    };
-
-    ensureDefaultProduct();
-    return () => {
-      active = false;
-    };
-  }, []);
+  }, [handoffToListingDealerDash, router]);
 
   useEffect(() => {
     if (sessionExpired) {
@@ -490,37 +809,32 @@ export default function BusinessRegistrationPage() {
 
     try {
       setSendingEmailOtp(true);
-      await sendEmailOtp({ email: form.business_email.trim(), purpose: 3 });
-      setEmailOtpSent(true);
+      const email = String(form.business_email || "").trim().toLowerCase();
+      setJsonCookie("otp_context", {
+        type: "email",
+        email,
+        purpose: 3,
+        product_key: PRODUCT_KEY,
+        redirect_to: "/auth/business-reg",
+      });
+      await sendEmailOtp({ email, purpose: 3 });
+      setJsonCookie("business_reg_draft", {
+        ...form,
+        display_name_manually_edited: displayNameManuallyEdited,
+        current_step: currentStep,
+      });
       setErrorMessage("");
+      setSuccessMessage("");
+      setOtpModalType("email");
+      setOtpTargetLabel(email);
+      setOtpCode("");
+      setShowOtpResendOptions(false);
+      setOtpResetKey((prev) => prev + 1);
+      setOtpModalOpen(true);
     } catch (err) {
       setErrorMessage(err?.response?.data?.message || t.emailOtpSendFailed);
     } finally {
       setSendingEmailOtp(false);
-    }
-  };
-
-  const handleVerifyBusinessEmailOtp = async () => {
-    if (!emailOtp || emailOtp.length < 4 || verifyingEmailOtp) return;
-
-    try {
-      setVerifyingEmailOtp(true);
-      await verifyEmailOtp({
-        email: form.business_email.trim(),
-        otp: emailOtp.trim(),
-        purpose: 3,
-      });
-      setEmailVerified(true);
-      setCookie("business_email_verified", "true");
-      setCookie("verified_business_email", form.business_email.trim());
-      setErrorMessage("");
-    } catch (err) {
-      setEmailVerified(false);
-      removeCookie("business_email_verified");
-      removeCookie("verified_business_email");
-      setErrorMessage(err?.response?.data?.message || t.emailOtpVerifyFailed);
-    } finally {
-      setVerifyingEmailOtp(false);
     }
   };
 
@@ -551,7 +865,7 @@ export default function BusinessRegistrationPage() {
       country_code: countryCode,
       mobile_number: mobile,
       purpose: 2,
-      via: "whatsapp",
+      via: mobileOtpVia,
       product_key: PRODUCT_KEY,
       redirect_to: "/auth/business-reg",
     };
@@ -559,15 +873,78 @@ export default function BusinessRegistrationPage() {
     try {
       setSendingMobileOtp(true);
       setErrorMessage("");
-      setJsonCookie("business_reg_draft", form);
+      setJsonCookie("business_reg_draft", {
+        ...form,
+        display_name_manually_edited: displayNameManuallyEdited,
+        current_step: currentStep,
+      });
       removeCookie("business_mobile_verified");
       setJsonCookie("otp_context", otpContext);
       await sendOtp(otpContext);
-      router.push(`/auth/otp?lang=${lang}`);
+      setSuccessMessage("");
+      setOtpModalType("mobile");
+      setOtpTargetLabel(`+${countryCode}${mobile}`);
+      setOtpCode("");
+      setShowOtpResendOptions(false);
+      setOtpResetKey((prev) => prev + 1);
+      setOtpModalOpen(true);
     } catch (err) {
       setErrorMessage(getErrorMessage(err, "Failed to send mobile OTP"));
     } finally {
       setSendingMobileOtp(false);
+    }
+  };
+
+  const handleSendBusinessWhatsappOtp = async () => {
+    if (
+      !isValidWhatsapp ||
+      !isWhatsappDifferentFromPrimary ||
+      sendingWhatsappOtp ||
+      whatsappVerified
+    ) {
+      return;
+    }
+
+    let countryCode = normalizeCountryCode(form.country_code || country?.dialCode);
+    if (!countryCode) {
+      setErrorMessage("Please select a country code.");
+      return;
+    }
+
+    const otpContext = {
+      type: "mobile",
+      identifier_type: 0,
+      country_code: countryCode,
+      mobile_number: whatsappNumber,
+      purpose: 2,
+      via: whatsappOtpVia,
+      product_key: PRODUCT_KEY,
+      redirect_to: "/auth/business-reg",
+    };
+
+    try {
+      setSendingWhatsappOtp(true);
+      setErrorMessage("");
+      setJsonCookie("business_reg_draft", {
+        ...form,
+        display_name_manually_edited: displayNameManuallyEdited,
+        current_step: currentStep,
+      });
+      removeCookie("business_whatsapp_verified");
+      removeCookie("verified_business_whatsapp");
+      setJsonCookie("otp_context", otpContext);
+      await sendOtp(otpContext);
+      setSuccessMessage("");
+      setOtpModalType("whatsapp");
+      setOtpTargetLabel(`+${countryCode}${whatsappNumber}`);
+      setOtpCode("");
+      setShowOtpResendOptions(false);
+      setOtpResetKey((prev) => prev + 1);
+      setOtpModalOpen(true);
+    } catch (err) {
+      setErrorMessage(getErrorMessage(err, "Failed to send WhatsApp OTP"));
+    } finally {
+      setSendingWhatsappOtp(false);
     }
   };
 
@@ -629,10 +1006,17 @@ export default function BusinessRegistrationPage() {
       setEditingSeanebId(false);
       setSeanebIdMessage(t.seanebIdVerifiedMessage || "SeaNeB ID verified.");
       setSeanebIdMessageType("success");
+      setCookie(BUSINESS_SEANEB_VERIFIED_COOKIE, "true");
+      setCookie(
+        VERIFIED_BUSINESS_SEANEB_ID_COOKIE,
+        String(form.seaneb_id || "").trim().toLowerCase()
+      );
       setErrorMessage("");
     } catch (err) {
       setSeanebVerified(false);
       setEditingSeanebId(true);
+      removeCookie(BUSINESS_SEANEB_VERIFIED_COOKIE);
+      removeCookie(VERIFIED_BUSINESS_SEANEB_ID_COOKIE);
       const status = Number(err?.response?.status || 0);
       setSeanebIdMessageType("error");
       if (status === 409) {
@@ -652,6 +1036,8 @@ export default function BusinessRegistrationPage() {
     setEditingSeanebId(true);
     setSeanebIdMessage("");
     setSeanebIdMessageType("");
+    removeCookie(BUSINESS_SEANEB_VERIFIED_COOKIE);
+    removeCookie(VERIFIED_BUSINESS_SEANEB_ID_COOKIE);
   };
 
   const handleSubmit = async () => {
@@ -661,6 +1047,7 @@ export default function BusinessRegistrationPage() {
     setLoading(true);
     setSuccessMessage("");
     setErrorMessage("");
+    const resolvedAddress = String(form.place?.label || "").trim();
 
     const normalizedBusinessName = normalizeBusinessLabel(form.business_name);
     const normalizedDisplayName = normalizeBusinessLabel(
@@ -677,8 +1064,7 @@ export default function BusinessRegistrationPage() {
       whatsapp_number:
         form.whatsapp_number.trim() || form.primary_number.trim(),
       about_branch: form.about_branch.trim(),
-      address: form.address.trim(),
-      landmark: form.landmark.trim(),
+      address: resolvedAddress,
       place_id: form.place.place_id,
       main_category_id: form.main_category_id,
     };
@@ -703,10 +1089,12 @@ export default function BusinessRegistrationPage() {
 
       setSuccessMessage(t.businessRegisterSuccess);
       removeCookie("business_reg_draft");
+      removeCookie(BUSINESS_SEANEB_VERIFIED_COOKIE);
+      removeCookie(VERIFIED_BUSINESS_SEANEB_ID_COOKIE);
       setCookie("dashboard_mode", "dealer", { days: 365 });
       setCookie("profile_completed", "true", { days: 365 });
 
-      router.replace("/auth/dealerdash");
+      handoffToListingDealerDash();
     } catch (err) {
       setErrorMessage(getErrorMessage(err, t.businessRegisterError));
     } finally {
@@ -723,105 +1111,81 @@ export default function BusinessRegistrationPage() {
       onLangChange={setLang}
       variant="reg"
       showBack={true}
-      backFallback="/auth/userdash"
+      backFallback={`${webAppUrl}/`}
     >
-      <div>
-        <div className="mb-3.5">
-          <div className="mb-2.5">
-            <h2 className="mb-1.5 mt-0.5 text-[40px] font-semibold leading-[1.1] tracking-[-0.02em] text-(--color-text-primary) [@media(max-width:900px)]:text-[30px] [@media(max-width:640px)]:text-[32px]">
-              {t.businessRegTitle}
-            </h2>
-            <p className="mb-4.5 mt-2 max-w-[64ch] text-[15px] leading-normal text-(--color-text-muted) [@media(max-width:900px)]:mb-3.5 [@media(max-width:900px)]:text-[14px]">
-              {t.businessRegSubtitle}
-            </p>
-          </div>
+      <div className="space-y-4">
+        <div className="rounded-[18px] border border-[#d5e3f3] bg-[linear-gradient(120deg,#f7fbff_0%,#eef5ff_52%,#e8f1ff_100%)] p-5 shadow-[0_16px_32px_rgba(14,48,101,0.10)]">
+          <span className="inline-flex h-6 items-center rounded-full border border-[#bfd2ec] bg-[rgba(255,255,255,0.82)] px-3 text-[11px] font-bold uppercase tracking-[0.08em] text-[#24518c]">
+            Dealer Onboarding
+          </span>
+          <h2 className="mb-1.5 mt-3 text-[42px] font-semibold leading-[1.06] tracking-[-0.03em] text-[#0b2d66] [@media(max-width:900px)]:text-[34px] [@media(max-width:640px)]:text-[30px]">
+            {t.businessRegTitle}
+          </h2>
+          <p className="mb-0 mt-2 max-w-[72ch] text-[15px] leading-normal text-[#3d5c84] [@media(max-width:900px)]:text-[14px]">
+            {t.businessRegSubtitle}
+          </p>
+        </div>
 
-          <div className="mb-3.5 mt-2">
-            <div className="mb-1.5 flex items-center justify-between text-[13px] text-(--color-text-muted-strong)">
-              <span>Form completion</span>
-              <strong className="text-(--color-text-primary)">{completionPercent}%</strong>
+        <div className="rounded-[18px] border border-[#1f4f97] bg-[linear-gradient(135deg,#0f3b78_0%,#1852a1_58%,#2a66bd_100%)] p-4 text-[var(--color-white)] shadow-[0_18px_34px_rgba(11,45,101,0.28)]">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <span className="inline-flex h-6 items-center rounded-full border border-[rgba(255,255,255,0.32)] bg-[rgba(255,255,255,0.14)] px-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[rgba(255,255,255,0.95)]">
+                Progress
+              </span>
+              <span className="text-[13px] text-[rgba(255,255,255,0.88)]">Form completion</span>
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-(--color-border-soft)">
-              <span
-                className="block h-full rounded-full bg-[linear-gradient(90deg,var(--color-btn-primary-bg)_0%,var(--color-btn-primary-hover)_100%)]"
-                style={{ width: `${completionPercent}%` }}
+            <strong className="inline-flex h-7 items-center rounded-full border border-[rgba(255,255,255,0.26)] bg-[rgba(255,255,255,0.16)] px-3 text-[13px] font-semibold text-[var(--color-white)]">
+              {completionPercent}%
+            </strong>
+          </div>
+          <div className="h-2.5 overflow-hidden rounded-full bg-[rgba(255,255,255,0.24)]">
+            <span
+              className="block h-full rounded-full bg-[linear-gradient(90deg,#80d2ff_0%,#dff3ff_100%)] transition-all duration-500 ease-out"
+              style={{ width: `${completionPercent}%` }}
+            />
+          </div>
+          <div className="mt-3 grid grid-cols-4 gap-2.5 [@media(max-width:900px)]:grid-cols-2">
+            <StatusTile label="Mobile" done={mobileVerified} value={mobileVerified ? "Verified" : "Pending"} />
+            <StatusTile
+              label="Email"
+              done={!hasBusinessEmail || emailVerified}
+              value={!hasBusinessEmail ? "Optional" : emailVerified ? "Verified" : "Pending"}
+            />
+            <StatusTile
+              label="Location"
+              done={Boolean(form.place.place_id)}
+              value={form.place.place_id ? "Selected" : "Pending"}
+            />
+            <StatusTile label="Branch" done={Boolean(branchId)} value={branchId ? "Created" : "New"} />
+          </div>
+        </div>
+
+        <div className="rounded-[16px] border border-[#d2deef] bg-[var(--color-white)] p-4 shadow-[0_10px_24px_rgba(15,42,85,0.08)]">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="mb-1 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#2f5d95]">
+                Step {currentStep} of {WIZARD_STEPS.length}
+              </p>
+              <h3 className="m-0 text-[18px] font-semibold text-[#0c2f63]">
+                {currentStepMeta.title}
+              </h3>
+              <p className="mb-0 mt-1 text-[13px] text-[#4a678d]">{currentStepMeta.subtitle}</p>
+            </div>
+            <span className="inline-flex h-8 items-center rounded-full border border-[#c5d7ef] bg-[#f1f7ff] px-3 text-[12px] font-semibold text-[#24518c]">
+              {Math.round((currentStep / WIZARD_STEPS.length) * 100)}%
+            </span>
+          </div>
+          <div className="grid grid-cols-4 gap-2 [@media(max-width:900px)]:grid-cols-2">
+            {WIZARD_STEPS.map((step) => (
+              <WizardStepBadge
+                key={step.id}
+                title={step.title}
+                active={currentStep === step.id}
+                done={stepCompletionMap[step.id] === true}
+                locked={step.id > maxReachableStep}
+                onClick={() => goToStep(step.id)}
               />
-            </div>
-          </div>
-
-          <div className="mb-1.5 grid grid-cols-4 gap-2.5 [@media(max-width:900px)]:grid-cols-2">
-            <div
-              className={`flex flex-col gap-[3px] rounded-[12px] border px-3 py-[10px] ${
-                mobileVerified
-                  ? "border-[var(--color-bizpro-pill-verified-border)] bg-[var(--color-bizpro-pill-verified-bg)]"
-                  : "border-[var(--color-border-bizpro)] bg-[var(--color-surface-section)]"
-              }`}
-            >
-              <span className="text-[12px] text-[var(--color-text-muted)]">Mobile</span>
-              <strong
-                className={`text-[13px] ${
-                  mobileVerified
-                    ? "text-[var(--color-bizpro-pill-verified-text)]"
-                    : "text-[var(--color-text-primary)]"
-                }`}
-              >
-                {mobileVerified ? "Verified" : "Pending"}
-              </strong>
-            </div>
-            <div
-              className={`flex flex-col gap-0.75 rounded-xl border px-3 py-2.5 ${
-                emailVerified
-                  ? "border-(--color-bizpro-pill-verified-border) bg-(--color-bizpro-pill-verified-bg)"
-                  : "border-(--color-border-bizpro) bg-(--color-surface-section)"
-              }`}
-            >
-              <span className="text-[12px] text-(--color-text-muted)">Email</span>
-              <strong
-                className={`text-[13px] ${
-                  emailVerified
-                    ? "text-(--color-bizpro-pill-verified-text)"
-                    : "text-(--color-text-primary)"
-                }`}
-              >
-                {emailVerified ? "Verified" : "Pending"}
-              </strong>
-            </div>
-            <div
-              className={`flex flex-col gap-0.75 rounded-xl border px-3 py-2.5 ${
-                form.place.place_id
-                  ? "border-(--color-bizpro-pill-verified-border) bg-(--color-bizpro-pill-verified-bg)"
-                  : "border-(--color-border-bizpro) bg-(--color-surface-section)"
-              }`}
-            >
-              <span className="text-[12px] text-(--color-text-muted)">Location</span>
-              <strong
-                className={`text-[13px] ${
-                  form.place.place_id
-                    ? "text-(--color-bizpro-pill-verified-text)"
-                    : "text-(--color-text-primary)"
-                }`}
-              >
-                {form.place.place_id ? "Selected" : "Pending"}
-              </strong>
-            </div>
-            <div
-              className={`flex flex-col gap-0.75 rounded-xl border px-3 py-2.5 ${
-                branchId
-                  ? "border-(--color-bizpro-pill-verified-border) bg-(--color-bizpro-pill-verified-bg)"
-                  : "border-(--color-border-bizpro) bg-(--color-surface-section)"
-              }`}
-            >
-              <span className="text-[12px] text-(--color-text-muted)">Branch</span>
-              <strong
-                className={`text-[13px] ${
-                  branchId
-                    ? "text-(--color-bizpro-pill-verified-text)"
-                    : "text-(--color-text-primary)"
-                }`}
-              >
-                {branchId ? "Created" : "New"}
-              </strong>
-            </div>
+            ))}
           </div>
         </div>
 
@@ -840,11 +1204,16 @@ export default function BusinessRegistrationPage() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
+            if (currentStep < WIZARD_STEPS.length) {
+              handleNextStep();
+              return;
+            }
             handleSubmit();
           }}
-          className="grid gap-3.5"
+          className="grid gap-4"
         >
-          <section className="rounded-2xl border border-(--color-border-bizpro) bg-[linear-gradient(180deg,var(--color-white)_0%,var(--color-surface-section)_100%)] p-4.5 shadow-[0_10px_22px_rgba(15,23,42,0.05)]">
+          {currentStep === 1 && (
+          <section className={BIZ_SECTION_CLASS}>
             <div>
               <h3 className="m-0 text-[16px] text-(--color-text-primary)">{t.businessInfoSection}</h3>
               <p className="mb-0 mt-1.25 text-[13px] text-(--color-text-muted)">
@@ -898,10 +1267,8 @@ export default function BusinessRegistrationPage() {
                               key={`${business.place_id || "biz"}-${idx}`}
                               className={BIZ_SUGGESTION_ITEM_CLASS}
                               onMouseDown={() => {
+                                setDisplayNameManuallyEdited(false);
                                 handleChange("business_name", businessLabel);
-                                if (!form.display_name.trim()) {
-                                  handleChange("display_name", businessLabel.split("-")[0].trim());
-                                }
                                 setShowBusinessSuggestions(false);
                               }}
                             >
@@ -918,7 +1285,13 @@ export default function BusinessRegistrationPage() {
                 <input
                   className={BIZ_INPUT_CLASS}
                   value={form.display_name}
-                  onChange={(e) => handleChange("display_name", e.target.value)}
+                  onChange={(e) => {
+                    const nextDisplayName = e.target.value;
+                    setDisplayNameManuallyEdited(
+                      isManualDisplayName(nextDisplayName, form.business_name)
+                    );
+                    handleChange("display_name", nextDisplayName);
+                  }}
                   placeholder={t.displayNamePlaceholder}
                 />
               </Field>
@@ -1036,8 +1409,10 @@ export default function BusinessRegistrationPage() {
               </Field>
             </div>
           </section>
+          )}
 
-          <section className="rounded-[16px] border border-[var(--color-border-bizpro)] bg-[linear-gradient(180deg,var(--color-white)_0%,var(--color-surface-section)_100%)] p-[18px] shadow-[0_10px_22px_rgba(15,23,42,0.05)]">
+          {currentStep === 2 && (
+          <section className={BIZ_SECTION_CLASS}>
             <div>
               <h3 className="m-0 text-[16px] text-[var(--color-text-primary)]">{t.contactSection}</h3>
               <p className="mb-0 mt-[5px] text-[13px] text-[var(--color-text-muted)]">
@@ -1050,7 +1425,7 @@ export default function BusinessRegistrationPage() {
                 <div className="relative" ref={countryDropdownRef}>
                   <button
                     type="button"
-                    className="flex h-[46px] w-full items-center justify-between rounded-[11px] border border-[#d9e1ec] bg-[var(--color-white)] px-[12px] text-left transition-[border-color,box-shadow,transform] duration-200 ease-in-out hover:border-[#9fb8de] focus:border-[#0f4ec9] focus:outline-none focus:[box-shadow:0_0_0_4px_rgba(15,78,201,0.18)]"
+                    className="flex h-[48px] w-full items-center justify-between rounded-[12px] border border-[#c6d6ea] bg-[var(--color-white)] px-[12px] text-left transition-[border-color,box-shadow,transform] duration-200 ease-in-out hover:border-[#8eadcf] focus:border-[#0f4ec9] focus:outline-none focus:[box-shadow:0_0_0_4px_rgba(15,78,201,0.16)]"
                     onClick={() => setShowCountries((prev) => !prev)}
                   >
                     <span className="flex min-w-0 items-center gap-2">
@@ -1069,7 +1444,7 @@ export default function BusinessRegistrationPage() {
                   </button>
 
                   {showCountries && (
-                    <div className="absolute left-0 top-[50px] z-[70] max-h-[260px] w-full overflow-y-auto rounded-[12px] border border-[#d9e1ec] bg-[var(--color-white)] shadow-[0_14px_28px_rgba(15,23,42,0.12)]">
+                    <div className="absolute left-0 top-[52px] z-[70] max-h-[260px] w-full overflow-y-auto rounded-[12px] border border-[#c6d6ea] bg-[var(--color-white)] shadow-[0_16px_30px_rgba(15,42,85,0.16)]">
                       {countries.map((item) => (
                         <button
                           type="button"
@@ -1122,6 +1497,33 @@ export default function BusinessRegistrationPage() {
                     {sendingMobileOtp ? t.sendingOtp : mobileVerified ? t.verified : t.sendOtp}
                   </button>
                 </div>
+                {!mobileVerified && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="text-[12px] text-[var(--color-text-muted)]">Send via:</span>
+                    <button
+                      type="button"
+                      className={`rounded-md border px-2 py-1 text-[12px] ${
+                        mobileOtpVia === "whatsapp"
+                          ? "border-[#0f4ec9] bg-[#eaf2ff] text-[#0f4ec9]"
+                          : "border-[#c6d6ea] bg-white text-[#40608a]"
+                      }`}
+                      onClick={() => setMobileOtpVia("whatsapp")}
+                    >
+                      WhatsApp
+                    </button>
+                    <button
+                      type="button"
+                      className={`rounded-md border px-2 py-1 text-[12px] ${
+                        mobileOtpVia === "sms"
+                          ? "border-[#0f4ec9] bg-[#eaf2ff] text-[#0f4ec9]"
+                          : "border-[#c6d6ea] bg-white text-[#40608a]"
+                      }`}
+                      onClick={() => setMobileOtpVia("sms")}
+                    >
+                      SMS
+                    </button>
+                  </div>
+                )}
                 {!isValidPrimaryNumber && form.primary_number.length > 0 && (
                   <p className={BIZ_HELPER_ERROR_CLASS}>{t.primaryNumberHelper}</p>
                 )}
@@ -1131,27 +1533,79 @@ export default function BusinessRegistrationPage() {
               </Field>
 
               <Field label={t.whatsappNumber}>
-                <input
-                  className={BIZ_INPUT_CLASS}
-                  value={form.whatsapp_number}
-                  onChange={(e) =>
-                    handleChange("whatsapp_number", e.target.value.replace(/\D/g, ""))
-                  }
-                  inputMode="numeric"
-                  maxLength={15}
-                  placeholder={t.whatsappNumberPlaceholder}
-                  autoComplete="tel"
-                />
+                <div className={BIZ_VERIFY_WRAPPER_CLASS}>
+                  <input
+                    className={BIZ_INPUT_CLASS}
+                    value={form.whatsapp_number}
+                    onChange={(e) =>
+                      handleChange("whatsapp_number", e.target.value.replace(/\D/g, ""))
+                    }
+                    inputMode="numeric"
+                    maxLength={15}
+                    placeholder={t.whatsappNumberPlaceholder}
+                    autoComplete="tel"
+                  />
+                  {(requiresWhatsappVerification || whatsappVerified) && (
+                    <button
+                      type="button"
+                      className={
+                        whatsappVerified
+                          ? BIZ_VERIFY_BUTTON_VERIFIED_CLASS
+                          : BIZ_VERIFY_BUTTON_BASE_CLASS
+                      }
+                      disabled={!isValidWhatsapp || sendingWhatsappOtp || whatsappVerified}
+                      onClick={handleSendBusinessWhatsappOtp}
+                    >
+                      {sendingWhatsappOtp
+                        ? t.sendingOtp
+                        : whatsappVerified
+                        ? t.verified
+                        : t.sendOtp}
+                    </button>
+                  )}
+                </div>
                 {!isValidWhatsapp && (
                   <p className={BIZ_HELPER_ERROR_CLASS}>{t.whatsappNumberHelper}</p>
                 )}
+                {requiresWhatsappVerification && !whatsappVerified && (
+                  <>
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="text-[12px] text-[var(--color-text-muted)]">Send via:</span>
+                      <button
+                        type="button"
+                        className={`rounded-md border px-2 py-1 text-[12px] ${
+                          whatsappOtpVia === "whatsapp"
+                            ? "border-[#0f4ec9] bg-[#eaf2ff] text-[#0f4ec9]"
+                            : "border-[#c6d6ea] bg-white text-[#40608a]"
+                        }`}
+                        onClick={() => setWhatsappOtpVia("whatsapp")}
+                      >
+                        WhatsApp
+                      </button>
+                      <button
+                        type="button"
+                        className={`rounded-md border px-2 py-1 text-[12px] ${
+                          whatsappOtpVia === "sms"
+                            ? "border-[#0f4ec9] bg-[#eaf2ff] text-[#0f4ec9]"
+                            : "border-[#c6d6ea] bg-white text-[#40608a]"
+                        }`}
+                        onClick={() => setWhatsappOtpVia("sms")}
+                      >
+                        SMS
+                      </button>
+                    </div>
+                    <p className={BIZ_HELPER_ERROR_CLASS}>
+                      Verify WhatsApp number before submission.
+                    </p>
+                  </>
+                )}
               </Field>
 
-              <Field label={`${t.businessEmail} (Optional)`} hint="If provided, email must be verified.">
+              <Field label={`${String(t.businessEmail || "Business Email").replace(/\s*\*+\s*$/, "")} (Optional)`}>
                 <div className={BIZ_VERIFY_WRAPPER_CLASS}>
                   <input
                     type="email"
-                    className={BIZ_INPUT_CLASS}
+                    className={`${BIZ_INPUT_CLASS} pr-[132px]`}
                     value={form.business_email}
                     onChange={(e) => handleChange("business_email", e.target.value)}
                     autoComplete="email"
@@ -1170,48 +1624,16 @@ export default function BusinessRegistrationPage() {
                     {sendingEmailOtp ? t.sendingOtp : emailVerified ? t.verified : t.sendOtp}
                   </button>
                 </div>
-
-                {emailOtpSent && !emailVerified && (
-                  <div className={BIZ_VERIFY_OTP_ROW_CLASS}>
-                    <input
-                      className={BIZ_INPUT_CLASS}
-                      value={emailOtp}
-                      onChange={(e) =>
-                        setEmailOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
-                      }
-                      inputMode="numeric"
-                      maxLength={6}
-                      placeholder={t.emailOtpPlaceholder}
-                    />
-                    <button
-                      type="button"
-                      className={BIZ_VERIFY_OTP_BUTTON_CLASS}
-                      disabled={emailOtp.length < 4 || verifyingEmailOtp}
-                      onClick={handleVerifyBusinessEmailOtp}
-                    >
-                      {verifyingEmailOtp ? t.verifying : t.verifyOtp}
-                    </button>
-                  </div>
+                {!emailVerified && isValidEmail && (
+                  <p className={BIZ_HELPER_CLASS}>OTP will open in this page.</p>
                 )}
-
-                <p
-                  className={
-                    emailVerified || !form.business_email.trim()
-                      ? BIZ_HELPER_CLASS
-                      : BIZ_HELPER_ERROR_CLASS
-                  }
-                >
-                  {emailVerified
-                    ? t.emailVerifiedSuccess
-                    : !form.business_email.trim()
-                    ? "Email is optional."
-                    : t.emailVerifyHelper}
-                </p>
               </Field>
             </div>
           </section>
+          )}
 
-          <section className="rounded-2xl border border-(--color-border-bizpro) bg-[linear-gradient(180deg,var(--color-white)_0%,var(--color-surface-section)_100%)] p-[18px] shadow-[0_10px_22px_rgba(15,23,42,0.05)]">
+          {currentStep === 3 && (
+          <section className={BIZ_SECTION_CLASS}>
             <div>
               <h3 className="m-0 text-[16px] text-(--color-text-primary)">{t.locationSection}</h3>
               <p className="mb-0 mt-1.25 text-[13px] text-(--color-text-muted)">
@@ -1220,25 +1642,6 @@ export default function BusinessRegistrationPage() {
             </div>
 
             <div className="mt-3.5 grid grid-cols-2 gap-3.5 [@media(max-width:640px)]:grid-cols-1">
-              <Field label={t.address}>
-                <input
-                  className={BIZ_INPUT_CLASS}
-                  value={form.address}
-                  onChange={(e) => handleChange("address", e.target.value)}
-                  placeholder={t.addressPlaceholder}
-                  autoComplete="street-address"
-                />
-              </Field>
-
-              <Field label={t.landmark}>
-                <input
-                  className={BIZ_INPUT_CLASS}
-                  value={form.landmark}
-                  onChange={(e) => handleChange("landmark", e.target.value)}
-                  placeholder={t.landmarkPlaceholder}
-                />
-              </Field>
-
               <Field label={t.place}>
                 <AutoComplete
                   value={form.place.label}
@@ -1251,7 +1654,7 @@ export default function BusinessRegistrationPage() {
                 />
               </Field>
 
-              <Field label={t.aboutBranch}>
+              <Field label="About Business *">
                 <textarea
                   className={BIZ_TEXTAREA_CLASS}
                   value={form.about_branch}
@@ -1267,8 +1670,10 @@ export default function BusinessRegistrationPage() {
               </Field>
             </div>
           </section>
+          )}
 
-          <section className="rounded-2xl border border-(--color-border-bizpro) bg-[linear-gradient(180deg,var(--color-white)_0%,var(--color-surface-section)_100%)] p-[18px] shadow-[0_10px_22px_rgba(15,23,42,0.05)]">
+          {currentStep === 4 && (
+          <section className={BIZ_SECTION_CLASS}>
             <div>
               <h3 className="m-0 text-[16px] text-[var(--color-text-primary)]">{t.complianceSection}</h3>
               <p className="mb-0 mt-[5px] text-[13px] text-[var(--color-text-muted)]">
@@ -1332,8 +1737,10 @@ export default function BusinessRegistrationPage() {
               </Field>
             </div>
           </section>
+          )}
 
-          <div className="rounded-[14px] border border-[var(--color-border-bizpro)] bg-[var(--color-white)] p-[14px]">
+          {currentStep === 4 && (
+          <div className="rounded-[18px] border border-[#d5e1f0] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)] p-[16px] shadow-[0_14px_28px_rgba(15,42,85,0.08)]">
             <label className="mb-3 flex items-center gap-[10px] text-[14px] text-[var(--color-text-body-strong)]">
               <input
                 type="checkbox"
@@ -1353,7 +1760,127 @@ export default function BusinessRegistrationPage() {
               {loading ? t.submitting : t.registerBusiness}
             </PrimaryButton>
           </div>
+          )}
+
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-[#d5e1f0] bg-[#f7fbff] px-4 py-3">
+            <button
+              type="button"
+              className="inline-flex h-11 min-w-[130px] items-center justify-center rounded-[10px] border border-[#b6c9e4] bg-[var(--color-white)] px-4 text-[14px] font-semibold text-[#214a81] transition-colors duration-200 hover:bg-[#edf4ff] disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={currentStep === 1 || loading}
+              onClick={handlePreviousStep}
+            >
+              Back
+            </button>
+
+            {currentStep < WIZARD_STEPS.length ? (
+              <button
+                type="button"
+                className="inline-flex h-11 min-w-[160px] items-center justify-center rounded-[10px] border border-[#0f4ec9] bg-[linear-gradient(135deg,#0f4ec9_0%,#0b3ea2_100%)] px-4 text-[14px] font-semibold text-[var(--color-white)] shadow-[0_10px_22px_rgba(15,78,201,0.28)] transition-transform duration-200 hover:translate-y-[-1px]"
+                onClick={handleNextStep}
+                disabled={loading}
+              >
+                Continue
+              </button>
+            ) : (
+              <span className="text-[13px] font-medium text-[#4a678d]">
+                Final step: review details and submit.
+              </span>
+            )}
+          </div>
         </form>
+
+        {otpModalOpen && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-[rgba(8,18,36,0.62)] px-4">
+            <div className="w-full max-w-[460px] rounded-[16px] border border-[#d5e1f0] bg-white p-5 shadow-[0_24px_48px_rgba(8,25,62,0.24)]">
+              <h3 className="m-0 text-[22px] font-semibold text-[#0b2d66]">
+                {t.otpTitle || "Verify OTP"}
+              </h3>
+              <p className="mt-2 text-[13px] text-[var(--color-text-muted)]">
+                {inlineOtpIsEmail ? "OTP sent to" : "OTP sent to"} {otpTargetLabel}
+              </p>
+
+              <OtpInput length={4} onComplete={setOtpCode} resetKey={otpResetKey} />
+
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  className="h-10 flex-1 rounded-[10px] border border-[#b7cbe6] bg-white text-[14px] font-semibold text-[#285189]"
+                  onClick={() => {
+                    setOtpModalOpen(false);
+                    setOtpCode("");
+                    setShowOtpResendOptions(false);
+                    setOtpResetKey((prev) => prev + 1);
+                  }}
+                >
+                  Cancel
+                </button>
+                <PrimaryButton
+                  className="mt-0 h-10 flex-1 rounded-[10px] text-[14px]"
+                  activeClassName="cursor-pointer bg-[linear-gradient(135deg,#0f4ec9_0%,#0b3ea2_100%)] text-[var(--color-white)] shadow-[0_10px_20px_rgba(15,78,201,0.28)]"
+                  disabledClassName="cursor-not-allowed bg-[var(--color-btn-disabled-bg)] text-[var(--color-btn-disabled-text)]"
+                  disabled={otpCode.length !== 4 || verifyingInlineOtp}
+                  onClick={() => verifyInlineOtp(otpCode)}
+                >
+                  {verifyingInlineOtp ? t.verifying : t.verifyOtp}
+                </PrimaryButton>
+              </div>
+
+              {inlineOtpInfoMessage && (
+                <p className="mt-2 text-[12px] text-[var(--color-text-muted)]">{inlineOtpInfoMessage}</p>
+              )}
+
+              <div className="mt-2 text-center">
+                <button
+                  type="button"
+                  className="text-[13px] text-[#1a73e8] underline disabled:text-[#9aabc4]"
+                  disabled={inlineOtpCooldown > 0 || resendingInlineOtp}
+                  onClick={() => {
+                    if (inlineOtpIsEmail) {
+                      resendInlineOtp();
+                      return;
+                    }
+                    setShowOtpResendOptions((prev) => !prev);
+                  }}
+                >
+                  {inlineOtpCooldown > 0
+                    ? (t.resendAvailableIn || "Resend in {{seconds}}s").replace(
+                        "{{seconds}}",
+                        inlineOtpCooldown
+                      )
+                    : t.resendOtp || "Resend OTP"}
+                </button>
+              </div>
+
+              {!inlineOtpIsEmail && showOtpResendOptions && inlineOtpCooldown === 0 && (
+                <div className="mt-2 flex items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    className="text-[13px] text-[#1a73e8]"
+                    disabled={resendingInlineOtp}
+                    onClick={() => {
+                      resendInlineOtp("whatsapp");
+                      setShowOtpResendOptions(false);
+                    }}
+                  >
+                    WhatsApp
+                  </button>
+                  <span className="text-[13px] text-[#9baec8]">|</span>
+                  <button
+                    type="button"
+                    className="text-[13px] text-[#1a73e8]"
+                    disabled={resendingInlineOtp}
+                    onClick={() => {
+                      resendInlineOtp("sms");
+                      setShowOtpResendOptions(false);
+                    }}
+                  >
+                    SMS
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </AuthLayout>
   );
@@ -1362,7 +1889,7 @@ export default function BusinessRegistrationPage() {
 function Field({ label, hint, children }) {
   return (
     <div className="min-w-0">
-      <label className="mb-[7px] block text-[13px] font-semibold text-[var(--color-text-form-label)]">
+      <label className="mb-[8px] block text-[13px] font-semibold tracking-[0.01em] text-[#1f3f68]">
         {label}
       </label>
       {children}
@@ -1370,3 +1897,64 @@ function Field({ label, hint, children }) {
     </div>
   );
 }
+
+function StatusTile({ label, value, done }) {
+  return (
+    <div
+      className={`rounded-[12px] border px-3.5 py-2.5 transition-colors duration-200 ${
+        done
+          ? "border-[#b8e8cc] bg-[rgba(255,255,255,0.94)]"
+          : "border-[rgba(255,255,255,0.24)] bg-[rgba(255,255,255,0.10)]"
+      }`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className={`text-[11px] uppercase tracking-[0.05em] ${done ? "text-[#46698f]" : "text-[rgba(255,255,255,0.86)]"}`}>
+          {label}
+        </span>
+        <span
+          className={`h-2.5 w-2.5 rounded-full ${
+            done ? "bg-[var(--color-success)]" : "bg-[rgba(255,255,255,0.45)]"
+          }`}
+        />
+      </div>
+      <strong
+        className={`mt-1 block text-[13px] ${
+          done
+            ? "text-[#11512f]"
+            : "text-[var(--color-white)]"
+        }`}
+      >
+        {value}
+      </strong>
+    </div>
+  );
+}
+
+function WizardStepBadge({ title, active, done, locked, onClick }) {
+  return (
+    <button
+      type="button"
+      disabled={locked}
+      onClick={onClick}
+      className={`rounded-[10px] border px-3 py-2 text-left transition-colors duration-200 ${
+        active
+          ? "border-[#1a5ec5] bg-[#eaf2ff]"
+          : done
+          ? "border-[#b8e8cc] bg-[#f2fbf6]"
+          : "border-[#d4e1f1] bg-[#f7fbff]"
+      } ${locked ? "cursor-not-allowed opacity-55" : "cursor-pointer hover:bg-[#ecf4ff]"}`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="line-clamp-1 text-[12px] font-semibold text-[#20497f]">
+          {title}
+        </span>
+        <span
+          className={`h-2.5 w-2.5 rounded-full ${
+            done ? "bg-[var(--color-success)]" : active ? "bg-[#2d67c3]" : "bg-[#9eb4d1]"
+          }`}
+        />
+      </div>
+    </button>
+  );
+}
+

@@ -4,13 +4,19 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import countries from "@/app/constant/country.json";
-import AuthLayout from "@/app/component/AuthLayout";
-import useTranslation from "@/app/hook/useTranslation";
-import PrimaryButton from "@/app/component/PrimaryButton";
+import countries from "@/constants/country.json";
+import AuthLayout from "@/components/AuthLayout";
+import useTranslation from "@/hooks/useTranslation";
+import useAppLang from "@/hooks/useAppLang";
+import PrimaryButton from "@/components/PrimaryButton";
 
-import { sendOtp } from "@/app/services/otp.services";
-import { setJsonCookie } from "@/app/services/cookieStore";
+import { sendOtp } from "@/services/otp.services";
+import { setJsonCookie } from "@/services/cookieStore";
+import { getActiveProductKey } from "@/lib/productKey";
+import {
+  clearPopupReturnTarget,
+  savePopupReturnTarget,
+} from "@/lib/auth/popupAuthBridge";
 
 const getSafeInternalNextPath = (value) => {
   const next = String(value || "").trim();
@@ -27,10 +33,7 @@ function LoginContent() {
 
   const [mobile, setMobile] = useState("");
   const [method, setMethod] = useState("whatsapp");
-  const [lang, setLang] = useState(() => {
-    const value = String(searchParams?.get("lang") || "en").trim().toLowerCase();
-    return value || "en";
-  });
+  const [lang, setLang] = useAppLang(searchParams);
   const [country, setCountry] = useState(countries[0]);
   const [showCountries, setShowCountries] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -41,11 +44,27 @@ function LoginContent() {
   );
 
   useEffect(() => {
-    const value = String(searchParams?.get("lang") || "").trim().toLowerCase();
-    if (value && value !== lang) {
-      setLang(value);
+    const returnTo = String(searchParams?.get("return_to") || "").trim();
+    const returnOrigin = String(searchParams?.get("return_origin") || "").trim();
+    if (!returnTo && !returnOrigin) {
+      clearPopupReturnTarget();
+      return;
     }
-  }, [lang, searchParams]);
+    savePopupReturnTarget({ returnTo, returnOrigin });
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const current = new URL(window.location.href);
+    const hadReturnTo = current.searchParams.has("return_to");
+    const hadReturnOrigin = current.searchParams.has("return_origin");
+    if (!hadReturnTo && !hadReturnOrigin) return;
+
+    current.searchParams.delete("return_to");
+    current.searchParams.delete("return_origin");
+    const nextUrl = `${current.pathname}${current.search}${current.hash}`;
+    window.history.replaceState({}, "", nextUrl);
+  }, [searchParams]);
 
   const t = useTranslation(lang);
   const isValidMobile = mobile.length === 10;
@@ -62,6 +81,7 @@ function LoginContent() {
       mobile_number: mobile,
       purpose: 0,
       via: method,
+      product_key: getActiveProductKey(),
       ...(safeNextPath ? { redirect_to: safeNextPath } : {}),
     };
 
@@ -69,13 +89,9 @@ function LoginContent() {
       // Save context for verify/resend page
       setJsonCookie("otp_context", otpContext);
 
-      const res = await sendOtp(otpContext);
+      await sendOtp(otpContext);
 
-      console.log("OTP Sent:", res?.data);
-
-      router.push(
-        `/auth/otp?mobile=${country.dialCode}${mobile}&lang=${lang}`
-      );
+      router.push("/auth/otp");
     } catch (err) {
       const status = Number(err?.response?.status || 0);
       const message =
@@ -86,7 +102,6 @@ function LoginContent() {
           : status >= 500
           ? "Server error while sending OTP. Please try again."
           : "Failed to send OTP");
-      console.warn("SEND OTP ERROR:", { status, message });
       alert(message);
     } finally {
       setLoading(false);

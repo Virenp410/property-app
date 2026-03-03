@@ -3,12 +3,16 @@
 import { Suspense, useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 
-import AuthLayout from "@/app/component/AuthLayout";
-import OtpInput from "@/app/component/OtpInput";
-import useTranslation from "@/app/hook/useTranslation";
-import PrimaryButton from "@/app/component/PrimaryButton";
-import useOtp from "@/app/hook/useOtp";
-import { getJsonCookie, setCookie } from "@/app/services/cookieStore";
+import AuthLayout from "@/components/AuthLayout";
+import OtpInput from "@/components/OtpInput";
+import useTranslation from "@/hooks/useTranslation";
+import useAppLang from "@/hooks/useAppLang";
+import PrimaryButton from "@/components/PrimaryButton";
+import useOtp from "@/hooks/useOtp";
+import { getCookie, getJsonCookie, setCookie } from "@/services/cookieStore";
+import { getCurrentUserProfile } from "@/services/user.services";
+import { refreshAccessToken } from "@/lib/auth/apiClient";
+import { notifyParentAndClose } from "@/lib/auth/popupAuthBridge";
 
 const getSafeInternalRedirectPath = (value) => {
   const next = String(value || "").trim();
@@ -19,27 +23,39 @@ const getSafeInternalRedirectPath = (value) => {
   return next;
 };
 
-const withLangQuery = (path, lang) => {
-  const [basePart, hashPart = ""] = String(path || "").split("#");
-  const [pathname, queryString = ""] = basePart.split("?");
-  const params = new URLSearchParams(queryString);
-  if (!params.get("lang")) {
-    params.set("lang", lang);
+const pickTokenValue = (payload, keys) => {
+  const keyList = Array.isArray(keys) ? keys : [keys];
+  for (const key of keyList) {
+    const value = String(
+      payload?.[key] ||
+        payload?.data?.[key] ||
+        payload?.tokens?.[key] ||
+        payload?.data?.tokens?.[key] ||
+        ""
+    ).trim();
+    if (value) return value;
   }
-  const query = params.toString();
-  const hashSuffix = hashPart ? `#${hashPart}` : "";
-  return query ? `${pathname}?${query}${hashSuffix}` : `${pathname}${hashSuffix}`;
+  return "";
 };
 
 function VerifyOtpContent() {
   const router = useRouter();
-  const params = useSearchParams();
+  const searchParams = useSearchParams();
 
-  const [lang, setLang] = useState(params.get("lang") || "en");
+  const [lang, setLang] = useAppLang(searchParams);
   const t = useTranslation(lang);
-  const webAppUrl = String(
-    process.env.NEXT_PUBLIC_WEB_APP_URL || "http://localhost:1003"
-  ).replace(/\/$/, "");
+  const webAppUrl = String(process.env.NEXT_PUBLIC_WEB_APP_URL || "").replace(/\/$/, "");
+
+  const redirectToWebHome = () => {
+    const handedOff = notifyParentAndClose({ status: "authenticated" });
+    if (handedOff) return;
+
+    if (typeof window !== "undefined") {
+      window.location.href = `${webAppUrl}/`;
+      return;
+    }
+    router.replace(`${webAppUrl}/`);
+  };
 
   const [finalOtp, setFinalOtp] = useState("");
   const [showResendOptions, setShowResendOptions] = useState(false);
@@ -65,41 +81,134 @@ function VerifyOtpContent() {
     t,
     onSuccess: (response) => {
       const continueRouting = async () => {
+        const otpType = String(otpContext?.type || "").trim().toLowerCase();
         const redirectTo = getSafeInternalRedirectPath(otpContext?.redirect_to);
         const mobilePurpose = Number(otpContext?.purpose ?? 0);
+        const isMobileUserFlow = otpType === "mobile" && mobilePurpose === 0;
+        const isBusinessMobileFlow = otpType === "mobile" && mobilePurpose === 2;
+        const isEmailFlow = otpType === "email";
 
-        const hasAccessToken =
-          typeof response?.access_token === "string" &&
-          response.access_token.length > 10;
+        const accessToken = pickTokenValue(response, ["access_token", "accessToken", "token"]);
+        const csrfToken = pickTokenValue(response, ["csrf_token", "csrfToken"]);
+        const hasAccessToken = accessToken.length > 10;
+        const hasCsrfToken = csrfToken.length > 10;
+        const hasCookieRefresh = String(getCookie("refresh_token") || "").trim().length > 10;
+        const hasCookieCsrf = String(getCookie("csrf_token") || "").trim().length > 10;
+        const hasSessionHint = hasAccessToken || hasCookieRefresh;
 
-        if (redirectTo && mobilePurpose !== 0) {
-          router.replace(withLangQuery(redirectTo, lang));
+        if (isBusinessMobileFlow) {
+          router.replace(redirectTo || "/auth/business-reg");
           return;
         }
 
-        if (!hasAccessToken) {
+        if (isEmailFlow) {
           if (redirectTo) {
-            setCookie("post_auth_redirect", redirectTo, { days: 1 });
-            router.replace(
-              `/auth/reg?lang=${lang}&redirect_to=${encodeURIComponent(redirectTo)}`
-            );
+            router.replace(redirectTo);
             return;
           }
-          router.replace(`/auth/reg?lang=${lang}`);
+
+          if (mobilePurpose === 3) {
+            router.replace("/auth/business-reg");
+            return;
+          }
+
+          router.replace("/auth/reg");
+          return;
+        }
+
+        if (isMobileUserFlow) {
+          const resolveAuthenticatedUser = async () => {
+            try {
+              const profile = await getCurrentUserProfile();
+              const hasProfileIdentity = Boolean(
+                String(
+                  profile?.profile?.seanebId ||
+                    profile?.profile?.displayName ||
+                    profile?.displayName ||
+                    ""
+                ).trim()
+              );
+              return hasProfileIdentity ? "authenticated" : "not_authenticated";
+            } catch (err) {
+              const status = Number(err?.response?.status || 0);
+              if (status !== 401 && status !== 403 && status !== 404) {
+                return hasSessionHint ? "unknown_but_session_present" : "not_authenticated";
+              }
+
+              const canTryRefresh =
+                hasCookieCsrf || hasCookieRefresh || hasAccessToken || hasCsrfToken;
+              if (!canTryRefresh) return "not_authenticated";
+
+              try {
+                await refreshAccessToken();
+                const profile = await getCurrentUserProfile();
+                const hasProfileIdentity = Boolean(
+                  String(
+                    profile?.profile?.seanebId ||
+                      profile?.profile?.displayName ||
+                      profile?.displayName ||
+                      ""
+                  ).trim()
+                );
+                return hasProfileIdentity ? "authenticated" : "not_authenticated";
+              } catch (retryError) {
+                const retryStatus = Number(retryError?.response?.status || 0);
+                if (retryStatus === 401 || retryStatus === 404) {
+                  return "not_authenticated";
+                }
+                if (retryStatus === 403) {
+                  return "unknown_but_session_present";
+                }
+                return hasSessionHint ? "unknown_but_session_present" : "not_authenticated";
+              }
+            }
+          };
+
+          const authenticationState = await resolveAuthenticatedUser();
+
+          if (
+            authenticationState === "authenticated" ||
+            authenticationState === "unknown_but_session_present"
+          ) {
+            setCookie("dashboard_mode", "user", { days: 365 });
+            if (redirectTo && redirectTo !== "/auth/reg") {
+              if (redirectTo === "/") {
+                redirectToWebHome();
+                return;
+              }
+              router.replace(redirectTo);
+              return;
+            }
+            redirectToWebHome();
+            return;
+          }
+
+          if (redirectTo) {
+            setCookie("post_auth_redirect", redirectTo, { days: 1 });
+            router.replace(`/auth/reg?redirect_to=${encodeURIComponent(redirectTo)}`);
+            return;
+          }
+
+          router.replace("/auth/reg");
           return;
         }
 
         if (redirectTo) {
-          router.replace(withLangQuery(redirectTo, lang));
+          if (redirectTo === "/") {
+            redirectToWebHome();
+            return;
+          }
+          router.replace(redirectTo);
+          return;
+        }
+
+        if (!hasSessionHint) {
+          router.replace("/auth/reg");
           return;
         }
 
         setCookie("dashboard_mode", "user", { days: 365 });
-        if (typeof window !== "undefined") {
-          window.location.href = `${webAppUrl}/?lang=${encodeURIComponent(lang)}`;
-          return;
-        }
-        router.replace(`/auth/userdash?lang=${lang}`);
+        redirectToWebHome();
       };
 
       continueRouting();
@@ -115,12 +224,7 @@ function VerifyOtpContent() {
   if (!otpContext) return null;
 
   return (
-    <AuthLayout
-      lang={lang}
-      onLangChange={setLang}
-      showBack={true}
-      backFallback="/auth/login"
-    >
+    <AuthLayout lang={lang} onLangChange={setLang} showBack={false}>
       <div className="mx-auto max-w-105 text-center">
         <h2 className="mb-1.5 text-[26px] font-semibold">{t.otpTitle}</h2>
         <p className="mb-5.5 text-[14px] text-[#666666]">{subtitle}</p>
