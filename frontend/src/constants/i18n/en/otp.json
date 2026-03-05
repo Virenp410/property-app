@@ -1,0 +1,19 @@
+{
+    "otpTitle":  "Verify OTP",
+    "otpSubtitle":  "Enter the 4 digit code sent to",
+    "verifyOtp":  "Verify OTP",
+    "resendOtp":  "Resend OTP",
+    "otpInvalid":  "Invalid OTP. Please try again.",
+    "otpExpired":  "OTP expired. Please resend the code.",
+    "otpTooManyAttempts":  "Too many attempts. Please wait.",
+    "otpVerifyFailed":  "OTP verification failed.",
+    "otpResentWhatsapp":  "A new OTP has been sent via WhatsApp.",
+    "otpResentSms":  "A new OTP has been sent via SMS.",
+    "otpResendFailed":  "Failed to resend OTP. Try again.",
+    "resendAvailableIn":  "Resend available in {{seconds}}s",
+    "successTitle":  "Registration Successful",
+    "successSubtitle":  "Your profile has been completed successfully.",
+    "goToDashboard":  "Go to Dashboard",
+    "verifying":  "Verifying...",
+    "otpResendTooFast":  "You are requesting OTP too frequently. Please wait."
+}
