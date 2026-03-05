@@ -3,9 +3,9 @@
     "version": "0.1.0",
     "private": true,
     "scripts": {
-        "dev": "dotenv -e .env -- next dev",
+        "dev": "node scripts/next-with-env-port.cjs dev",
         "build": "next build",
-        "start": "dotenv -e .env -- next start",
+        "start": "node scripts/next-with-env-port.cjs start",
         "lint": "eslint"
     },
     "dependencies": {
