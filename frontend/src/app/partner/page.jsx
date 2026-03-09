@@ -1,9 +1,10 @@
-﻿import { redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 
-export default function PartnerRoutePage() {
-  const webAppUrl = String(
-    process.env.NEXT_PUBLIC_WEB_APP_URL || "http://localhost:1003"
+const getWebAppUrl = () =>
+  String(
+    process.env.NEXT_PUBLIC_WEB_APP_URL || process.env.NEXT_PUBLIC_APP_URL || ""
   ).replace(/\/$/, "");
 
-  redirect(`${webAppUrl}/partner`);
+export default function PartnerRoutePage() {
+  redirect(`${getWebAppUrl()}/partner`);
 }

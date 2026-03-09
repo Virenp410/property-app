@@ -1,17 +1,22 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import countries from "@/app/constant/country.json";
-import AuthLayout from "../../component/AuthLayout";
-import useTranslation from "../../hook/useTranslation";
-import useAppLang from "../../hook/useAppLang";
-import PrimaryButton from "../../component/PrimaryButton";
+import countries from "@/constants/country.json";
+import AuthLayout from "@/components/AuthLayout";
+import useTranslation from "@/hooks/useTranslation";
+import useAppLang from "@/hooks/useAppLang";
+import PrimaryButton from "@/components/PrimaryButton";
 
-import { sendOtp } from "../../services/otp.services";
-import { setJsonCookie } from "../../services/cookieStore";
+import { sendOtp } from "@/services/otp.services";
+import { setJsonCookie } from "@/services/cookieStore";
+import { getActiveProductKey } from "@/lib/productKey";
+import {
+  clearPopupReturnTarget,
+  savePopupReturnTarget,
+} from "@/lib/auth/popupAuthBridge";
 
 const getSafeInternalNextPath = (value) => {
   const next = String(value || "").trim();
@@ -32,11 +37,37 @@ function LoginContent() {
   const [country, setCountry] = useState(countries[0]);
   const [showCountries, setShowCountries] = useState(false);
   const [loading, setLoading] = useState(false);
+  const hasCapturedPopupReturnTargetRef = useRef(false);
 
   const safeNextPath = useMemo(
     () => getSafeInternalNextPath(searchParams?.get("next")),
     [searchParams]
   );
+
+  useEffect(() => {
+    const returnTo = String(searchParams?.get("return_to") || "").trim();
+    const returnOrigin = String(searchParams?.get("return_origin") || "").trim();
+    if (!returnTo && !returnOrigin) {
+      if (hasCapturedPopupReturnTargetRef.current) return;
+      clearPopupReturnTarget();
+      return;
+    }
+    hasCapturedPopupReturnTargetRef.current = true;
+    savePopupReturnTarget({ returnTo, returnOrigin });
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const current = new URL(window.location.href);
+    const hadReturnTo = current.searchParams.has("return_to");
+    const hadReturnOrigin = current.searchParams.has("return_origin");
+    if (!hadReturnTo && !hadReturnOrigin) return;
+
+    current.searchParams.delete("return_to");
+    current.searchParams.delete("return_origin");
+    const nextUrl = `${current.pathname}${current.search}${current.hash}`;
+    window.history.replaceState({}, "", nextUrl);
+  }, [searchParams]);
 
   const t = useTranslation(lang);
   const isValidMobile = mobile.length === 10;
@@ -53,6 +84,7 @@ function LoginContent() {
       mobile_number: mobile,
       purpose: 0,
       via: method,
+      product_key: getActiveProductKey(),
       ...(safeNextPath ? { redirect_to: safeNextPath } : {}),
     };
 
@@ -60,9 +92,7 @@ function LoginContent() {
       // Save context for verify/resend page
       setJsonCookie("otp_context", otpContext);
 
-      const res = await sendOtp(otpContext);
-
-      console.log("OTP Sent:", res?.data);
+      await sendOtp(otpContext);
 
       router.push("/auth/otp");
     } catch (err) {
@@ -75,7 +105,6 @@ function LoginContent() {
           : status >= 500
           ? "Server error while sending OTP. Please try again."
           : "Failed to send OTP");
-      console.warn("SEND OTP ERROR:", { status, message });
       alert(message);
     } finally {
       setLoading(false);

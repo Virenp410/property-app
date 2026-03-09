@@ -4,50 +4,73 @@ import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Lottie from "lottie-react";
 
-import AuthLayout from "../../component/AuthLayout";
-import useTranslation from "../../hook/useTranslation";
-import useAppLang from "../../hook/useAppLang";
-import successAnim from "@/app/constant/lottieyfile/Checked.json";
-import { clearSession } from "../../services/api";
-import { getCookie, removeCookie, setCookie } from "../../services/cookieStore";
+import AuthLayout from "@/components/AuthLayout";
+import useTranslation from "@/hooks/useTranslation";
+import useAppLang from "@/hooks/useAppLang";
+import successAnim from "@/constants/lottieyfile/Checked.json";
+import { clearServerSession } from "@/services/api";
+import { getCurrentUserProfile } from "@/services/user.services";
+import { getCookie, removeCookie, setCookie } from "@/services/cookieStore";
+import { notifyParentAndClose } from "@/lib/auth/popupAuthBridge";
+import { resolveWebSsoRedirectUrl } from "@/services/sso.services";
 
 function SuccessPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [lang] = useAppLang(searchParams);
   const t = useTranslation(lang);
+  const webAppUrl = String(
+    process.env.NEXT_PUBLIC_WEB_APP_URL || process.env.NEXT_PUBLIC_APP_URL || ""
+  ).replace(/\/$/, "");
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      const accessToken =
-        typeof window !== "undefined"
-          ? getCookie("access_token_auto") || getCookie("access_token")
-          : null;
-      const csrfToken =
-        typeof window !== "undefined"
-          ? getCookie("csrf_token_auto") || getCookie("csrf_token")
-          : null;
+    let active = true;
 
-      const hasSession =
-        typeof accessToken === "string" &&
-        accessToken.length > 10 &&
-        typeof csrfToken === "string" &&
-        csrfToken.length > 10;
+    const timer = setTimeout(async () => {
+      try {
+        await getCurrentUserProfile();
+        if (!active) return;
 
-      if (hasSession) {
+        const bridgeTokenFromQuery = String(searchParams?.get("bridge_token") || "").trim();
+        const bridgeTokenFromStore = String(getCookie("signup_bridge_token") || "").trim();
+        const bridgeToken = bridgeTokenFromQuery || bridgeTokenFromStore;
+        const homeTarget = await resolveWebSsoRedirectUrl({ webAppUrl, bridgeToken });
+        removeCookie("signup_bridge_token");
+        let targetOrigin = "";
+        try {
+          targetOrigin = new URL(homeTarget).origin;
+        } catch {
+          targetOrigin = "";
+        }
+        const handedOff = notifyParentAndClose({
+          status: "success",
+          returnTo: homeTarget,
+          returnOrigin: targetOrigin,
+        });
+        if (handedOff) return;
+
         removeCookie("post_auth_redirect");
         setCookie("dashboard_mode", "user", { days: 365 });
-        router.push("/auth/post-register");
-        return;
+        const target = homeTarget;
+        if (typeof window !== "undefined") {
+          window.location.href = target;
+          return;
+        }
+        router.replace(target);
+      } catch {
+        if (!active) return;
+        removeCookie("signup_bridge_token");
+        removeCookie("post_auth_redirect");
+        await clearServerSession();
+        router.push("/auth/login");
       }
-
-      removeCookie("post_auth_redirect");
-      clearSession();
-      router.push("/auth/login");
     }, 2200);
 
-    return () => clearTimeout(timer);
-  }, [lang, router]);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [router, searchParams, webAppUrl]);
 
   return (
     <AuthLayout

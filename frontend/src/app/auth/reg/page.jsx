@@ -3,26 +3,29 @@
 import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import AuthLayout from "../../component/AuthLayout";
-import useTranslation from "../../hook/useTranslation";
-import useAppLang from "../../hook/useAppLang";
-import AutoComplete from "../../component/AutoComplete";
-import DatePicker from "../../component/DatePicker";
-import PrimaryButton from "../../component/PrimaryButton";
-import CustomDropdown from "../../component/CustomDropdown";
-import SeanebIdField from "../../component/SeanebId";
+import AuthLayout from "@/components/AuthLayout";
+import useTranslation from "@/hooks/useTranslation";
+import useAppLang from "@/hooks/useAppLang";
+import AutoComplete from "@/components/AutoComplete";
+import DatePicker from "@/components/DatePicker";
+import PrimaryButton from "@/components/PrimaryButton";
+import CustomDropdown from "@/components/CustomDropdown";
+import SeanebIdField from "@/components/SeanebId";
+import TermsConditionsModal from "@/components/TermsConditionsModal";
 
-import { signupUser } from "../../services/auth.services";
-import { sendEmailOtp } from "../../services/otp.services";
-import { setSessionTokens } from "../../services/api";
-import { PRODUCT_KEY } from "../../services/productKey";
+import { signupUser } from "@/services/auth.services";
+import { sendEmailOtp, sendOtp } from "@/services/otp.services";
+import { setSessionTokens } from "@/services/api";
+import { PRODUCT_KEY } from "@/lib/productKey";
+import { notifyParentAndClose } from "@/lib/auth/popupAuthBridge";
+import { readBridgeToken, resolveWebSsoRedirectUrl } from "@/services/sso.services";
 import {
   getCookie,
   setCookie,
   removeCookie,
   getJsonCookie,
   setJsonCookie,
-} from "../../services/cookieStore";
+} from "@/services/cookieStore";
 
 const EMPTY_FORM = {
   firstname: "",
@@ -108,15 +111,32 @@ const REG_LABEL_CLASS = "mb-1.5 block text-[14px] font-medium text-(--auth-field
 const REG_INPUT_CLASS =
   "h-11 w-full rounded-[10px] border border-(--auth-border) bg-[var(--color-white)] px-3.5 py-3 text-[14px] text-black placeholder:text-(--auth-placeholder) transition-[border-color,box-shadow] duration-200 ease-in-out focus:border-(--auth-border-strong) focus:outline-none focus:[box-shadow:0_0_0_4px_rgba(15,78,201,0.15)]";
 
+const getApiErrorDetails = (err) => {
+  const status = Number(err?.response?.status || 0);
+  const payload = err?.response?.data || {};
+  const code = String(payload?.error?.code || payload?.code || "").trim();
+  const message = String(
+    payload?.message ||
+      payload?.error?.message ||
+      err?.message ||
+      "Registration failed"
+  ).trim();
+  return { status, code, message, payload };
+};
+
 function RegistrationFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [lang, setLang] = useAppLang(searchParams);
   const t = useTranslation(lang);
+  const webAppUrl = String(
+    process.env.NEXT_PUBLIC_WEB_APP_URL || process.env.NEXT_PUBLIC_APP_URL || ""
+  ).replace(/\/$/, "");
 
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
 
   const [emailVerified, setEmailVerified] = useState(false);
   const [seanebVerified, setSeanebVerified] = useState(false);
@@ -171,10 +191,10 @@ function RegistrationFormContent() {
     if (!mounted) return;
 
     const hasData =
-      form.firstname ||
-      form.lastname ||
-      form.email ||
-      form.seanebId;
+      String(form.firstname || "").trim() ||
+      String(form.lastname || "").trim() ||
+      String(form.email || "").trim() ||
+      String(form.seanebId || "").trim();
 
     if (hasData) {
       setJsonCookie("reg_form_draft", form);
@@ -186,9 +206,9 @@ function RegistrationFormContent() {
     if (!mounted) return;
 
     const verified = getCookie("email_verified");
-    const verifiedEmail = getCookie("verified_email");
+    const verifiedEmail = String(getCookie("verified_email") || "").trim();
 
-    if (verified === "true" && verifiedEmail === form.email) {
+    if (verified === "true" && verifiedEmail === String(form.email || "").trim()) {
       setEmailVerified(true);
     }
   }, [form.email, mounted]);
@@ -221,23 +241,45 @@ function RegistrationFormContent() {
   }, [form.seanebId, mounted]);
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const hasEmail = String(form.email || "").trim().length > 0;
-  const isValidEmail = emailRegex.test(form.email);
+  const firstname = String(form.firstname || "").trim();
+  const lastname = String(form.lastname || "").trim();
+  const email = String(form.email || "").trim();
+  const gender = String(form.gender || "").trim();
+  const dob = String(form.dob || "").trim();
+  const hasEmail = email.length > 0;
+  const isValidEmail = emailRegex.test(email);
   const emailStepValid = !hasEmail || (isValidEmail && emailVerified);
-  const hasDob = String(form.dob || "").trim().length > 0;
+  const hasDob = dob.length > 0;
   const isDobEligible = isAtLeastAge(form.dob, MINIMUM_REGISTRATION_AGE);
 
   const isFormComplete =
-    form.firstname &&
-    form.lastname &&
+    firstname &&
+    lastname &&
     emailStepValid &&
     mobileVerified &&
-    form.gender &&
-    hasDob &&
+    gender &&
+    dob &&
     isDobEligible &&
     form.hometown.place_id &&
     seanebVerified &&
     form.agree;
+
+  const submitBlockers = [];
+  if (!firstname) submitBlockers.push("First name is required.");
+  if (!lastname) submitBlockers.push("Last name is required.");
+  if (!mobileVerified) submitBlockers.push("Mobile number is not verified.");
+  if (!gender) submitBlockers.push("Gender is required.");
+  if (!hasDob) submitBlockers.push("Date of birth is required.");
+  if (hasDob && !isDobEligible)
+    submitBlockers.push("Minimum age is 13 years for registration.");
+  if (!form.hometown.place_id)
+    submitBlockers.push("Select hometown from suggestions.");
+  if (!seanebVerified)
+    submitBlockers.push("SeaNeB ID verification is required.");
+  if (!form.agree) submitBlockers.push("Accept terms and conditions.");
+  if (hasEmail && !isValidEmail) submitBlockers.push("Enter a valid email address.");
+  if (!emailStepValid)
+    submitBlockers.push("Verify email OTP or clear email field.");
 
   const handleChange = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -279,6 +321,37 @@ function RegistrationFormContent() {
     }));
   };
 
+  const redirectToWebHome = async (authPayload = null) => {
+    const bridgeTokenFromPayload = String(readBridgeToken(authPayload) || "").trim();
+    const bridgeTokenFromQuery = String(searchParams?.get("bridge_token") || "").trim();
+    const bridgeTokenFromStore = String(getCookie("signup_bridge_token") || "").trim();
+    const bridgeToken = bridgeTokenFromPayload || bridgeTokenFromQuery || bridgeTokenFromStore;
+    const target = await resolveWebSsoRedirectUrl({ webAppUrl, bridgeToken });
+    removeCookie("signup_bridge_token");
+
+    let targetOrigin = "";
+    try {
+      targetOrigin = new URL(target).origin;
+    } catch {
+      targetOrigin = "";
+    }
+
+    const handedOff = notifyParentAndClose({
+      status: "success",
+      returnTo: target,
+      returnOrigin: targetOrigin,
+    });
+    if (handedOff) return;
+
+    removeCookie("post_auth_redirect");
+    setCookie("dashboard_mode", "user", { days: 365 });
+    if (typeof window !== "undefined") {
+      window.location.href = target;
+      return;
+    }
+    router.replace(target);
+  };
+
   /* mobile verified */
   const getVerifiedMobile = () => {
     return getJsonCookie("verified_mobile");
@@ -294,19 +367,58 @@ function RegistrationFormContent() {
       return;
     }
 
+    // Signup API requires OTP verified with signup purpose (0).
+    const verifiedPurpose = Number(mobileData?.purpose ?? -1);
+    if (verifiedPurpose !== 0) {
+      const countryCode = String(mobileData?.country_code || "").trim();
+      const mobileNumber = String(mobileData?.mobile_number || "").trim();
+      if (!countryCode || !mobileNumber) {
+        alert("Mobile verification context is invalid. Please verify OTP again.");
+        return;
+      }
+
+      const otpContext = {
+        type: "mobile",
+        identifier_type: 0,
+        country_code: countryCode,
+        mobile_number: mobileNumber,
+        purpose: 0,
+        via: "whatsapp",
+        product_key: PRODUCT_KEY,
+      };
+
+      try {
+        setCookie("flow", "otp_verified");
+        setJsonCookie("reg_form_draft", form);
+        setJsonCookie("otp_context", otpContext);
+        setCookie("mobile_verified", "false");
+        removeCookie("verified_mobile");
+
+        await sendOtp(otpContext);
+        alert("Signup OTP sent. Please verify OTP to continue registration.");
+        router.push("/auth/otp");
+      } catch (otpErr) {
+        const details = getApiErrorDetails(otpErr);
+        const statusText = details.status ? ` [HTTP ${details.status}]` : "";
+        const codeText = details.code ? ` [${details.code}]` : "";
+        alert(`Unable to send signup OTP: ${details.message}${statusText}${codeText}`);
+      }
+      return;
+    }
+
     try {
       setLoading(true);
 
-            const signupResponse = await signupUser({
+      const signupResponse = await signupUser({
         country_code: mobileData.country_code,
         mobile_number: mobileData.mobile_number,
-        first_name: form.firstname,
-        last_name: form.lastname,
-        ...(hasEmail ? { email: form.email } : {}),
-        gender: form.gender.toLowerCase(),
-        dob: form.dob,
+        first_name: firstname,
+        last_name: lastname,
+        ...(hasEmail ? { email } : {}),
+        gender: gender.toLowerCase(),
+        dob,
         place_id: form.hometown.place_id,
-        seaneb_id: form.seanebId,
+        seaneb_id: String(form.seanebId || "").trim(),
         product_key: PRODUCT_KEY,
       });
 
@@ -323,13 +435,19 @@ function RegistrationFormContent() {
       ) {
         setSessionTokens({
           access_token: accessToken,
-          csrf_token: csrfToken,
         });
       }
 
       const fullName = `${String(form.firstname || "").trim()} ${String(form.lastname || "").trim()}`.trim();
       if (fullName) {
         setCookie("user_display_name", fullName, { days: 365 });
+      }
+
+      const signupBridgeToken = readBridgeToken(signupResponse);
+      if (signupBridgeToken) {
+        setCookie("signup_bridge_token", signupBridgeToken, { days: 1 });
+      } else {
+        removeCookie("signup_bridge_token");
       }
 
 
@@ -341,21 +459,13 @@ function RegistrationFormContent() {
       removeCookie(VERIFIED_SEANEB_ID_COOKIE);
       // Keep verified_mobile/otp_context so dealer business flow can re-send
       // mobile OTP with correct country code.
-      const redirectFromQuery = searchParams?.get("redirect_to");
-      const redirectFromCookie = getCookie("post_auth_redirect");
-      const postAuthRedirect =
-        getSafeInternalRedirectPath(redirectFromQuery) ||
-        getSafeInternalRedirectPath(redirectFromCookie);
-      if (postAuthRedirect) {
-        setCookie("post_auth_redirect", postAuthRedirect, { days: 1 });
-        router.push(
-          `/auth/success?redirect_to=${encodeURIComponent(postAuthRedirect)}`
-        );
-        return;
-      }
-      router.push("/auth/success");
+      await redirectToWebHome(signupResponse);
     } catch (err) {
-      alert(err?.response?.data?.message || "Registration failed" || response?.data?.error?.message);
+      const { status, code, message } = getApiErrorDetails(err);
+
+      const statusText = status ? ` [HTTP ${status}]` : "";
+      const codeText = code ? ` [${code}]` : "";
+      alert(`${message}${statusText}${codeText}`);
     } finally {
       setLoading(false);
     }
@@ -560,7 +670,16 @@ function RegistrationFormContent() {
               handleChange("agree", e.target.checked)
             }
           />
-          {t.terms}
+          <span>
+            I agree to the{" "}
+            <button
+              type="button"
+              onClick={() => setShowTermsModal(true)}
+              className="border-0 bg-transparent p-0 font-semibold text-[#0f4ec9] underline underline-offset-2"
+            >
+              terms and conditions
+            </button>
+          </span>
         </label>
 
         <PrimaryButton
@@ -570,7 +689,16 @@ function RegistrationFormContent() {
         >
           {loading ? "Please wait..." : t.submit}
         </PrimaryButton>
+        {!isFormComplete && submitBlockers.length > 0 && (
+          <p className="mt-2 text-[12px] text-[#d93025]">{submitBlockers[0]}</p>
+        )}
       </div>
+
+      <TermsConditionsModal
+        open={showTermsModal}
+        onClose={() => setShowTermsModal(false)}
+        title="Terms and Conditions"
+      />
     </AuthLayout>
   );
 }

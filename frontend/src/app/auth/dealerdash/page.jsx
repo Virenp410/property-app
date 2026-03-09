@@ -1,17 +1,40 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { setCookie } from "../../services/cookieStore";
-import { getCurrentUserProfile } from "../../services/user.services";
+import { setCookie } from "@/services/cookieStore";
+import { getCurrentUserProfile } from "@/services/user.services";
+import { notifyParentAndClose } from "@/lib/auth/popupAuthBridge";
+import { resolveWebSsoRedirectUrl } from "@/services/sso.services";
 
 export default function DealerDashboardPage() {
   const router = useRouter();
   const webAppUrl = String(
-    process.env.NEXT_PUBLIC_WEB_APP_URL || "http://localhost:1003"
+    process.env.NEXT_PUBLIC_WEB_APP_URL || process.env.NEXT_PUBLIC_APP_URL || ""
   ).replace(/\/$/, "");
   const [profileResolved, setProfileResolved] = useState(false);
   const [dealerAllowed, setDealerAllowed] = useState(false);
+
+  const handleGoHome = async () => {
+    const homeTarget = await resolveWebSsoRedirectUrl({ webAppUrl });
+    let homeOrigin = "";
+    try {
+      homeOrigin = new URL(homeTarget).origin;
+    } catch {
+      homeOrigin = "";
+    }
+
+    const handedOff = notifyParentAndClose({
+      status: "dealer_home",
+      returnTo: homeTarget,
+      returnOrigin: homeOrigin,
+    });
+    if (handedOff) return;
+
+    if (typeof window !== "undefined") {
+      window.location.href = homeTarget;
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -21,7 +44,14 @@ export default function DealerDashboardPage() {
         const result = await getCurrentUserProfile();
         if (!active) return;
 
-        const profileRegistered = result?.profile?.isBusinessRegistered === true;
+        const profile = result?.profile;
+        if (!profile) {
+          setDealerAllowed(false);
+          router.replace("/auth/login");
+          return;
+        }
+
+        const profileRegistered = profile.isBusinessRegistered === true;
         if (!profileRegistered) {
           setDealerAllowed(false);
           router.replace("/auth/business-reg");
@@ -30,14 +60,11 @@ export default function DealerDashboardPage() {
 
         setDealerAllowed(true);
         setCookie("dashboard_mode", "dealer", { days: 365 });
-      } catch (err) {
+      } catch {
         if (!active) return;
         setDealerAllowed(false);
-        const status = Number(err?.response?.status || 0);
-        if ([401, 403].includes(status)) {
-          router.replace("/auth/login");
-          return;
-        }
+        router.replace("/auth/login");
+        return;
       } finally {
         if (active) {
           setProfileResolved(true);
@@ -50,6 +77,19 @@ export default function DealerDashboardPage() {
       active = false;
     };
   }, [router]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const current = new URL(window.location.href);
+    const hadReturnTo = current.searchParams.has("return_to");
+    const hadReturnOrigin = current.searchParams.has("return_origin");
+    if (!hadReturnTo && !hadReturnOrigin) return;
+
+    current.searchParams.delete("return_to");
+    current.searchParams.delete("return_origin");
+    const nextUrl = `${current.pathname}${current.search}${current.hash}`;
+    window.history.replaceState({}, "", nextUrl);
+  }, []);
 
   if (!profileResolved || !dealerAllowed) {
     return (
@@ -71,11 +111,7 @@ export default function DealerDashboardPage() {
             <button
               type="button"
               className="inline-flex min-h-10 items-center justify-center rounded-xl border border-[#7ba7dd] bg-[linear-gradient(180deg,#ffffff_0%,#edf5ff_100%)] px-4 text-sm font-semibold text-[#17467f] transition-[transform,background-color,border-color,box-shadow] duration-200 ease-in-out hover:translate-y-[-1px] hover:border-[#6a9bd8] hover:bg-[#e6f1ff] hover:shadow-[0_10px_18px_rgba(8,30,62,0.24)]"
-              onClick={() => {
-                if (typeof window !== "undefined") {
-                  window.location.href = `${webAppUrl}/`;
-                }
-              }}
+              onClick={handleGoHome}
             >
               Go to Home Page
             </button>
@@ -96,3 +132,4 @@ export default function DealerDashboardPage() {
     </div>
   );
 }
+
