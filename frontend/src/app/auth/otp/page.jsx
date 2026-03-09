@@ -99,6 +99,9 @@ function VerifyOtpContent() {
       const continueRouting = async () => {
         const otpType = String(otpContext?.type || "").trim().toLowerCase();
         const redirectTo = getSafeInternalRedirectPath(otpContext?.redirect_to);
+        const popupReturnTo = String(getCookie("auth_return_to") || "").trim();
+        const isBusinessRegisterRedirect = redirectTo === "/auth/business-reg";
+        const shouldPreferPopupHomeHandoff = Boolean(popupReturnTo) && isBusinessRegisterRedirect;
         const mobilePurpose = Number(otpContext?.purpose ?? 0);
         const isMobileUserFlow = otpType === "mobile" && mobilePurpose === 0;
         const isBusinessMobileFlow = otpType === "mobile" && mobilePurpose === 2;
@@ -133,6 +136,11 @@ function VerifyOtpContent() {
         }
 
         if (isMobileUserFlow) {
+          if (shouldPreferPopupHomeHandoff) {
+            await redirectToWebHome(response);
+            return;
+          }
+
           const resolveAuthenticatedUser = async () => {
             try {
               const profile = await getCurrentUserProfile();
