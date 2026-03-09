@@ -38,4 +38,4 @@ export default async function LegacyListingRedirect({ params, searchParams }) {
 
 
 
-// frontend folder added
+// inside frontend folder added all filse and folders
