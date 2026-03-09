@@ -1,0 +1,119 @@
+@import "tailwindcss";
+
+/* =====================================
+GLOBAL COLOR SYSTEM - PAGES & ELEMENTS
+===================================== */
+:root {
+  --color-brand-primary: #0b3f7a;
+  --color-brand-secondary: #12639a;
+
+  --color-page-bg: #ffffff;
+  --color-page-bg-soft: #f8fbff;
+  --color-page-bg-soft-2: #f7fbff;
+  --color-page-bg-muted: #f4f8fc;
+  --color-page-bg-alt: #f1f5f9;
+  --color-page-bg-dealer-start: #eef3f9;
+  --color-page-bg-dealer-end: #e7eef6;
+
+  --color-surface-card: #ffffff;
+  --color-surface-section: #f8fafc;
+  --color-surface-muted: #f3f4f6;
+  --color-surface-hover-neutral: #ececec;
+  --color-surface-inverse: #3a3a3a;
+  --color-surface-dealer-panel-end: #fbfdff;
+
+  --color-text-primary: #0f172a;
+  --color-text-heading: #111827;
+  --color-text-body-strong: #334155;
+  --color-text-muted: #64748b;
+  --color-text-muted-strong: #475569;
+  --color-text-inverted: #ffffff;
+  --color-text-form-label: #1e293b;
+  --color-text-dealer-subtitle: #d7e6f9;
+  --color-text-dealer-ghost-action: #1e3a57;
+
+  --color-border-default: #cbd5e1;
+  --color-border-soft: #e2e8f0;
+  --color-border-brand-soft: #93c5fd;
+  --color-border-bizpro: #dbe3ef;
+  --color-border-bizpro-pill-verified: #86efac;
+  --color-border-dealer-card: #d1dbe7;
+  --color-border-dealer-metric: #d5e0eb;
+  --color-border-dealer-panel: #d4dfeb;
+  --color-border-dealer-action-primary: #87b6ea;
+  --color-border-dealer-action-ghost: #c8d6e6;
+  --color-dealer-hero-border: rgba(255, 255, 255, 0.12);
+
+  --color-link-primary: #1e3a8a;
+  --color-dealer-hero-start: #061c4d;
+  --color-dealer-hero-mid: #0a346e;
+  --color-dealer-hero-end: #165999;
+  --color-dealer-overlay-page-1: rgba(20, 95, 170, 0.10);
+  --color-dealer-overlay-page-2: rgba(5, 33, 79, 0.12);
+  --color-dealer-overlay-hero-1: rgba(87, 160, 232, 0.28);
+
+  --color-btn-primary-bg: #2563eb;
+  --color-btn-primary-hover: #1d4ed8;
+  --color-btn-primary-text: #ffffff;
+  --color-btn-dealer-primary-start: #0f66c6;
+  --color-btn-dealer-primary-end: #2f86df;
+  --color-btn-dealer-primary-hover-start: #0a58ab;
+  --color-btn-dealer-primary-hover-end: #256fbf;
+  --color-btn-dealer-ghost-hover: #edf4fb;
+
+  --color-btn-secondary-bg: #ffffff;
+  --color-btn-secondary-hover: #eff6ff;
+  --color-btn-secondary-text: #1e3a8a;
+
+  --color-btn-disabled-bg: #e6e6e6;
+  --color-btn-disabled-text: #9a9a9a;
+
+  --color-bizpro-pill-verified-bg: #f0fdf4;
+  --color-bizpro-pill-verified-border: #86efac;
+  --color-bizpro-pill-verified-text: #166534;
+
+  --color-success: #22c55e;
+  --color-success-strong: #16a34a;
+  --color-warning: #f59e0b;
+  --color-danger: #dc2626;
+
+  --color-white: #ffffff;
+  --color-black: #111111;
+
+  --auth-subtle: #7b7b7b;
+  --auth-muted: #6b7280;
+  --auth-label: #444444;
+  --auth-field-label: #374151;
+  --auth-border: #e5e7eb;
+  --auth-border-strong: var(--color-black);
+  --auth-border-light: #d1d5db;
+  --auth-placeholder: #9ca3af;
+
+  --background: var(--color-white);
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
