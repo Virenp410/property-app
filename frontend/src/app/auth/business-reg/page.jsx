@@ -9,6 +9,7 @@ import AuthLayout from "@/components/AuthLayout";
 import AutoComplete from "@/components/AutoComplete";
 import PrimaryButton from "@/components/PrimaryButton";
 import OtpInput from "@/components/OtpInput";
+import TermsConditionsModal from "@/components/TermsConditionsModal";
 import useTranslation from "@/hooks/useTranslation";
 import useAppLang from "@/hooks/useAppLang";
 import useDebounce from "@/hooks/useDebaunce";
@@ -185,6 +186,7 @@ function BusinessRegistrationPageContent() {
   const [otpCode, setOtpCode] = useState("");
   const [otpResetKey, setOtpResetKey] = useState(0);
   const [showOtpResendOptions, setShowOtpResendOptions] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
   const submitLockRef = useRef(false);
   const businessAutocompleteRef = useRef(null);
   const countryDropdownRef = useRef(null);
@@ -1104,7 +1106,7 @@ function BusinessRegistrationPageContent() {
         </div>
 
         <div className="rounded-[16px] border border-[#d2deef] bg-[var(--color-white)] p-4 shadow-[0_10px_24px_rgba(15,42,85,0.08)]">
-          <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="mb-3 flex items-center gap-3">
             <div>
               <p className="mb-1 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#2f5d95]">
                 Step {currentStep} of {WIZARD_STEPS.length}
@@ -1114,9 +1116,6 @@ function BusinessRegistrationPageContent() {
               </h3>
               <p className="mb-0 mt-1 text-[13px] text-[#4a678d]">{currentStepMeta.subtitle}</p>
             </div>
-            <span className="inline-flex h-8 items-center rounded-full border border-[#c5d7ef] bg-[#f1f7ff] px-3 text-[12px] font-semibold text-[#24518c]">
-              {Math.round((currentStep / WIZARD_STEPS.length) * 100)}%
-            </span>
           </div>
           <div className="grid grid-cols-4 gap-2 [@media(max-width:900px)]:grid-cols-2">
             {WIZARD_STEPS.map((step) => (
@@ -1691,7 +1690,16 @@ function BusinessRegistrationPageContent() {
                 checked={form.agree}
                 onChange={(e) => handleChange("agree", e.target.checked)}
               />
-              <span>I agree to the business terms and conditions</span>
+              <span>
+                I agree to the business{" "}
+                <button
+                  type="button"
+                  onClick={() => setShowTermsModal(true)}
+                  className="border-0 bg-transparent p-0 font-semibold text-[#0f4ec9] underline underline-offset-2"
+                >
+                  terms and conditions
+                </button>
+              </span>
             </label>
 
             <PrimaryButton
@@ -1736,110 +1744,117 @@ function BusinessRegistrationPageContent() {
           <div className="fixed inset-0 z-[120] flex items-center justify-center bg-[rgba(6,18,41,0.72)] px-4 backdrop-blur-[2px]">
             <div className="w-full max-w-[500px] overflow-hidden rounded-[20px] border border-[#cbdcf2] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)] p-0 shadow-[0_28px_56px_rgba(6,25,67,0.34)]">
               <div className="border-b border-[#dce8f7] bg-[linear-gradient(90deg,#ecf4ff_0%,#f8fbff_100%)] px-6 py-4">
-                <span className="inline-flex rounded-full border border-[#c7d9f2] bg-white px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#255189]">
+                <span className="inline-flex rounded-full border border-[#c7d9f2] bg-white px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#0070E0]">
                   Security Check
                 </span>
               </div>
 
               <div className="px-6 pb-6 pt-5">
-              <h3 className="m-0 text-[30px] font-semibold leading-tight tracking-[-0.02em] text-[#0b2d66] [@media(max-width:640px)]:text-[25px]">
-                {t.otpTitle || "Verify OTP"}
-              </h3>
-              <p className="mt-2 text-[14px] text-[#4e6688]">
-                {inlineOtpIsEmail ? "OTP sent to" : "OTP sent to"} {otpTargetLabel}
-              </p>
+                <div className="mx-auto w-full max-w-[400px]">
+                  <h3 className="m-0 text-[42px] font-semibold leading-[1.08] tracking-[-0.02em] text-[#0070E0] [@media(max-width:640px)]:text-[30px]">
+                    {t.otpTitle || "Verify OTP"}
+                  </h3>
+                  <p className="mt-2 text-[14px] text-[#4e6688]">
+                    OTP sent to {otpTargetLabel}
+                  </p>
 
-              <OtpInput
-                length={4}
-                onComplete={setOtpCode}
-                resetKey={otpResetKey}
-                wrapperClassName="my-7 gap-3 [@media(max-width:640px)]:gap-2.5"
-                inputClassName="h-[56px] w-[56px] rounded-[14px] border-[#c6d8f0] bg-white text-[22px] shadow-[inset_0_1px_2px_rgba(18,55,104,0.06)] transition-[border-color,box-shadow,transform] duration-200 ease-in-out focus:border-[#0f4ec9] focus:[box-shadow:0_0_0_4px_rgba(15,78,201,0.15)] [@media(max-width:640px)]:h-[52px] [@media(max-width:640px)]:w-[52px]"
-              />
+                  <OtpInput
+                    length={4}
+                    onComplete={setOtpCode}
+                    resetKey={otpResetKey}
+                    wrapperClassName="my-6 gap-3 [@media(max-width:640px)]:gap-2.5"
+                    inputClassName="h-[56px] w-[56px] rounded-[14px] border-[#c6d8f0] bg-white text-[22px] shadow-[inset_0_1px_2px_rgba(18,55,104,0.06)] transition-[border-color,box-shadow,transform] duration-200 ease-in-out focus:border-[#0070E0] focus:[box-shadow:0_0_0_4px_rgba(0,112,224,0.15)] [@media(max-width:640px)]:h-[52px] [@media(max-width:640px)]:w-[52px]"
+                  />
 
-              <div className="mt-1 flex gap-3 [@media(max-width:640px)]:gap-2">
-                <button
-                  type="button"
-                  className="h-11 flex-1 rounded-[12px] border border-[#b7cbe6] bg-white text-[14px] font-semibold text-[#285189] transition-[background-color,border-color,color] duration-200 hover:border-[#92b2db] hover:bg-[#eef5ff]"
-                  onClick={() => {
-                    setOtpModalOpen(false);
-                    setOtpCode("");
-                    setShowOtpResendOptions(false);
-                    setOtpResetKey((prev) => prev + 1);
-                  }}
-                >
-                  Cancel
-                </button>
-                <PrimaryButton
-                  className="mt-0 h-11 flex-1 rounded-[12px] text-[14px] font-semibold"
-                  activeClassName="cursor-pointer bg-[linear-gradient(135deg,#1153d0_0%,#0a3f9f_100%)] text-[var(--color-white)] shadow-[0_12px_24px_rgba(15,78,201,0.34)] transition-transform duration-200 hover:translate-y-[-1px]"
-                  disabledClassName="cursor-not-allowed bg-[var(--color-btn-disabled-bg)] text-[var(--color-btn-disabled-text)]"
-                  disabled={otpCode.length !== 4 || verifyingInlineOtp}
-                  onClick={() => verifyInlineOtp(otpCode)}
-                >
-                  {verifyingInlineOtp ? t.verifying : t.verifyOtp}
-                </PrimaryButton>
-              </div>
+                  <div className="grid grid-cols-2 gap-3 [@media(max-width:640px)]:gap-2">
+                    <button
+                      type="button"
+                      className="inline-flex h-11 items-center justify-center rounded-[12px] border border-[#b7cbe6] bg-white px-3 text-[14px] font-semibold text-[#0070E0] transition-[background-color,border-color,color] duration-200 hover:border-[#92b2db] hover:bg-[#eef5ff]"
+                      onClick={() => {
+                        setOtpModalOpen(false);
+                        setOtpCode("");
+                        setShowOtpResendOptions(false);
+                        setOtpResetKey((prev) => prev + 1);
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex h-11 items-center justify-center rounded-[12px] bg-[#0070E0] px-3 text-[14px] font-semibold text-[var(--color-white)] shadow-[0_12px_24px_rgba(0,112,224,0.34)] transition-transform duration-200 hover:translate-y-[-1px] hover:bg-[#0061c1] disabled:cursor-not-allowed disabled:bg-[var(--color-btn-disabled-bg)] disabled:text-[var(--color-btn-disabled-text)] disabled:shadow-none"
+                      disabled={otpCode.length !== 4 || verifyingInlineOtp}
+                      onClick={() => verifyInlineOtp(otpCode)}
+                    >
+                      {verifyingInlineOtp ? t.verifying : t.verifyOtp}
+                    </button>
+                  </div>
 
-              {inlineOtpInfoMessage && (
-                <p className="mt-3 rounded-[10px] border border-[#d7e5f7] bg-[#f5f9ff] px-3 py-2 text-[12px] text-[#4e6688]">
-                  {inlineOtpInfoMessage}
-                </p>
-              )}
+                  {inlineOtpInfoMessage && (
+                    <p className="mt-3 rounded-[10px] border border-[#d7e5f7] bg-[#f5f9ff] px-3 py-2 text-[12px] text-[#4e6688]">
+                      {inlineOtpInfoMessage}
+                    </p>
+                  )}
 
-              <div className="mt-4 text-center">
-                <button
-                  type="button"
-                  className="text-[13px] font-semibold text-[#1a73e8] underline decoration-[#91baf1] underline-offset-3 disabled:text-[#9aabc4]"
-                  disabled={inlineOtpCooldown > 0 || resendingInlineOtp}
-                  onClick={() => {
-                    if (inlineOtpIsEmail) {
-                      resendInlineOtp();
-                      return;
-                    }
-                    setShowOtpResendOptions((prev) => !prev);
-                  }}
-                >
-                  {inlineOtpCooldown > 0
-                    ? (t.resendAvailableIn || "Resend in {{seconds}}s").replace(
-                        "{{seconds}}",
-                        inlineOtpCooldown
-                      )
-                    : t.resendOtp || "Resend OTP"}
-                </button>
-              </div>
+                  <div className="mt-4 text-center">
+                    <button
+                      type="button"
+                      className="text-[13px] font-semibold text-[#0070E0] underline decoration-[#91baf1] underline-offset-3 disabled:text-[#9aabc4]"
+                      disabled={inlineOtpCooldown > 0 || resendingInlineOtp}
+                      onClick={() => {
+                        if (inlineOtpIsEmail) {
+                          resendInlineOtp();
+                          return;
+                        }
+                        setShowOtpResendOptions((prev) => !prev);
+                      }}
+                    >
+                      {inlineOtpCooldown > 0
+                        ? (t.resendAvailableIn || "Resend in {{seconds}}s").replace(
+                            "{{seconds}}",
+                            inlineOtpCooldown
+                          )
+                        : t.resendOtp || "Resend OTP"}
+                    </button>
+                  </div>
 
-              {!inlineOtpIsEmail && showOtpResendOptions && inlineOtpCooldown === 0 && (
-                <div className="mt-3 flex items-center justify-center gap-3">
-                  <button
-                    type="button"
-                    className="inline-flex h-8 items-center justify-center rounded-full border border-[#b9d1ee] bg-white px-3 text-[12px] font-semibold text-[#195fa9] transition-colors duration-200 hover:bg-[#eef5ff]"
-                    disabled={resendingInlineOtp}
-                    onClick={() => {
-                      resendInlineOtp("whatsapp");
-                      setShowOtpResendOptions(false);
-                    }}
-                  >
-                    WhatsApp
-                  </button>
-                  <span className="text-[13px] text-[#9baec8]">or</span>
-                  <button
-                    type="button"
-                    className="inline-flex h-8 items-center justify-center rounded-full border border-[#b9d1ee] bg-white px-3 text-[12px] font-semibold text-[#195fa9] transition-colors duration-200 hover:bg-[#eef5ff]"
-                    disabled={resendingInlineOtp}
-                    onClick={() => {
-                      resendInlineOtp("sms");
-                      setShowOtpResendOptions(false);
-                    }}
-                  >
-                    SMS
-                  </button>
+                  {!inlineOtpIsEmail && showOtpResendOptions && inlineOtpCooldown === 0 && (
+                    <div className="mt-3 flex items-center justify-center gap-3">
+                      <button
+                        type="button"
+                        className="inline-flex h-8 items-center justify-center rounded-full border border-[#b9d1ee] bg-white px-3 text-[12px] font-semibold text-[#0070E0] transition-colors duration-200 hover:bg-[#eef5ff]"
+                        disabled={resendingInlineOtp}
+                        onClick={() => {
+                          resendInlineOtp("whatsapp");
+                          setShowOtpResendOptions(false);
+                        }}
+                      >
+                        WhatsApp
+                      </button>
+                      <span className="text-[13px] text-[#9baec8]">or</span>
+                      <button
+                        type="button"
+                        className="inline-flex h-8 items-center justify-center rounded-full border border-[#b9d1ee] bg-white px-3 text-[12px] font-semibold text-[#0070E0] transition-colors duration-200 hover:bg-[#eef5ff]"
+                        disabled={resendingInlineOtp}
+                        onClick={() => {
+                          resendInlineOtp("sms");
+                          setShowOtpResendOptions(false);
+                        }}
+                      >
+                        SMS
+                      </button>
+                    </div>
+                  )}
                 </div>
-              )}
               </div>
             </div>
           </div>
         )}
+
+        <TermsConditionsModal
+          open={showTermsModal}
+          onClose={() => setShowTermsModal(false)}
+          title="Business Terms and Conditions"
+        />
       </div>
     </AuthLayout>
   );
