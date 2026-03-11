@@ -3,7 +3,7 @@
     "version": "0.1.0",
     "private": true,
     "scripts": {
-        "dev": "node scripts/next-with-env-port.cjs dev",
+        "dev": "node scripts/next-with-env-port.cjs dev --webpack",
         "build": "next build",
         "start": "node scripts/next-with-env-port.cjs start",
         "lint": "eslint"

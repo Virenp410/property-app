@@ -74,28 +74,37 @@ export const notifyParentAndClose = (extra = {}) => {
     ...extra,
   };
 
+  let canNotifyOpener = false;
   try {
     // Popup auth flow: notify opener page that auth finished, then close popup.
     if (window.opener && !window.opener.closed && finalReturnOrigin) {
       window.opener.postMessage(payload, finalReturnOrigin);
       window.opener.focus();
+      canNotifyOpener = true;
     }
   } catch {
     // best effort only
+    canNotifyOpener = false;
   } finally {
     clearPopupReturnTarget();
   }
 
-  try {
-    window.close();
-  } catch {
-    // ignore close failures and fallback below
+  if (canNotifyOpener) {
+    try {
+      window.close();
+    } catch {
+      // ignore close failures and fallback below
+    }
+
+    const stillOpen = typeof window.closed === "boolean" ? !window.closed : true;
+    if (stillOpen) {
+      window.location.replace(finalReturnTo);
+    }
+    return true;
   }
 
-  const stillOpen = typeof window.closed === "boolean" ? !window.closed : true;
-  if (stillOpen) {
-    window.location.replace(finalReturnTo);
-  }
+  // If opener was closed, keep this tab open and redirect here.
+  window.location.replace(finalReturnTo);
 
   return true;
 };
