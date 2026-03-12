@@ -18,7 +18,7 @@ export default function AuthLayout({
   const logoSrc =
     logoBg === "dark" ? "/logo/white-logo-2.png" : "/logo/white-logo-3.svg";
   const webAppUrl = String(
-    process.env.NEXT_PUBLIC_WEB_APP_URL || "http://localhost:1003"
+    process.env.NEXT_PUBLIC_WEB_APP_URL || process.env.NEXT_PUBLIC_APP_URL || ""
   ).replace(/\/$/, "");
   const cardClasses =
     variant === "reg"

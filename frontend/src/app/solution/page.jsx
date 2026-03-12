@@ -2,7 +2,7 @@
 
 export default function SolutionRoutePage() {
   const webAppUrl = String(
-    process.env.NEXT_PUBLIC_WEB_APP_URL || "http://localhost:1003"
+    process.env.NEXT_PUBLIC_WEB_APP_URL || process.env.NEXT_PUBLIC_APP_URL || ""
   ).replace(/\/$/, "");
 
   redirect(`${webAppUrl}/solution`);
