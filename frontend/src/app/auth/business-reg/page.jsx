@@ -62,7 +62,7 @@ const WIZARD_STEPS = [
   {
     id: 1,
     title: "Business Identity",
-    subtitle: "Business name, category and SeaNeB branch ID verification.",
+    subtitle: "Business name, category and SeaNeB branch ID verification",
   },
   {
     id: 2,

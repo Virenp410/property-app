@@ -5,7 +5,7 @@ const resolveProductKey = () => {
   return key || "auto";
 };
 const resolveWebAppUrl = () =>
-  String(process.env.NEXT_PUBLIC_WEB_APP_URL || "http://localhost:1003")
+  String(process.env.NEXT_PUBLIC_WEB_APP_URL || process.env.NEXT_PUBLIC_APP_URL)
     .replace(/\/$/, "");
 
 const isLoginRoute = (pathname) => pathname.startsWith("/auth/login");
