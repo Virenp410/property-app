@@ -42,6 +42,7 @@ const EMPTY_FORM = {
   primary_number: "",
   whatsapp_number: "",
   business_email: "",
+  business_website: "",
   about_branch: "",
   place: { label: "", place_id: null },
   pan_number: "",
@@ -1052,6 +1053,11 @@ function BusinessRegistrationPageContent() {
       payload.business_email = form.business_email.trim();
     }
 
+    const businessWebsite = String(form.business_website || "").trim();
+    if (businessWebsite) {
+      payload.business_website = businessWebsite;
+    }
+
     if (form.pan_number.trim()) {
       payload.pan = { pan_number: form.pan_number.trim() };
     }
@@ -1569,6 +1575,17 @@ function BusinessRegistrationPageContent() {
                 {!emailVerified && isValidEmail && (
                   <p className={BIZ_HELPER_CLASS}>OTP will open in this page.</p>
                 )}
+              </Field>
+
+              <Field label={`${String(t.businessWebsite || "Business Website").replace(/\s*\*+\s*$/, "")} (Optional)`}>
+                <input
+                  type="url"
+                  className={BIZ_INPUT_CLASS}
+                  value={form.business_website}
+                  onChange={(e) => handleChange("business_website", e.target.value)}
+                  autoComplete="url"
+                  placeholder={t.businessWebsitePlaceholder || "https://example.com"}
+                />
               </Field>
             </div>
           </section>

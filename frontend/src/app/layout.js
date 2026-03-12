@@ -1,6 +1,7 @@
 import { Noto_Sans } from "next/font/google";
 import "./globals.css";
 import Script from "next/script";
+import AuthSessionRestore from "@/components/AuthSessionRestore";
  
 const notoSans = Noto_Sans({
   variable: "--font-noto-sans",
@@ -49,6 +50,7 @@ export default function RootLayout({ children }) {
           ></iframe>
         </noscript>
  
+        <AuthSessionRestore />
         {children}
       </body>
     </html>

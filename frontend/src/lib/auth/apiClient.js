@@ -115,14 +115,6 @@ apiClient.interceptors.request.use(async (config) => {
     return config;
   }
 
-  // Refresh flow: attempt silent refresh only when a refresh cookie exists.
-  const refreshCookie = readFirstCookie([
-    "refresh_token_auto",
-    "refresh_token",
-    "refresh",
-  ]);
-  if (!refreshCookie) return config;
-
   try {
     const token = await getRefreshPromise();
     if (token) {

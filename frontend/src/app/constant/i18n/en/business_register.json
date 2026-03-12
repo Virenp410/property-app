@@ -15,6 +15,8 @@
   "seanebBranchPlaceholder": "seaneb-branch01",
   "businessEmail": "Business Email *",
   "businessEmailPlaceholder": "name@company.com",
+  "businessWebsite": "Business Website",
+  "businessWebsitePlaceholder": "https://example.com",
   "primaryNumber": "Primary Number *",
   "primaryNumberPlaceholder": "Enter 10 to 15 digits",
   "primaryNumberHelper": "Enter a valid mobile number (10-15 digits).",
