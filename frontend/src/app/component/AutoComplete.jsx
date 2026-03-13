@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { getCities } from "../services/city.services";
+import { getCities } from "../../services/city.services";
 import useDebounce from "../hook/useDebaunce";
 
 const formatCityLabel = (city) =>

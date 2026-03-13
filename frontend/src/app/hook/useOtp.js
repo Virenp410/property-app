@@ -6,13 +6,13 @@ import {
   verifyOtp,
   sendEmailOtp,
   verifyEmailOtp,
-} from "../services/otp.services";
-import { setSessionTokens } from "../services/api";
+} from "/services/otp.services";
+import { setSessionTokens } from "/services/api";
 import {
   getJsonCookie,
   setCookie,
   setJsonCookie,
-} from "../services/cookieStore";
+} from "/services/cookieStore";
 
 export default function useOtp({ onSuccess, t }) {
   const INITIAL_RESEND_COOLDOWN = 60;

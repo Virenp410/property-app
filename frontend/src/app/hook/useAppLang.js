@@ -7,7 +7,7 @@ import {
   normalizeLang,
   setStoredLang,
   subscribeLang,
-} from "../services/langStore";
+} from "/services/langStore";
 
 export default function useAppLang(searchParams) {
   const lang = useSyncExternalStore(
