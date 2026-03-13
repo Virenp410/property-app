@@ -8,7 +8,7 @@ const normalizeApiOrigin = (value) =>
     .replace(/\/api$/i, "");
 
 const resolveApiOrigin = () => {
-  const mode = String(process.env.NEXT_ENV || process.env.NODE_ENV || "")
+  const mode = String(process.env.NEXT_ENV )
     .trim()
     .toLowerCase();
 
@@ -16,8 +16,8 @@ const resolveApiOrigin = () => {
   const centralOrigin = normalizeApiOrigin(process.env.NEXT_PUBLIC_CENTRAL_URL);
 
   return mode === "development"
-    ? devOrigin || centralOrigin
-    : centralOrigin || devOrigin;
+    ? devOrigin 
+    : centralOrigin;
 };
 
 const API_ORIGIN = resolveApiOrigin();
