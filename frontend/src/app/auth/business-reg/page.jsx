@@ -142,7 +142,7 @@ function BusinessRegistrationPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const webAppUrl = String(
-    process.env.NEXT_PUBLIC_WEB_APP_URL || process.env.NEXT_PUBLIC_APP_URL || ""
+    process.env.NEXT_PUBLIC_AUTH_APP_URL || process.env.NEXT_PUBLIC_APP_URL || ""
   ).replace(/\/$/, "");
   const [lang, setLang] = useAppLang(searchParams);
   const t = useTranslation(lang);

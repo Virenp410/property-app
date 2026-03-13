@@ -11,8 +11,10 @@ const resolveApiOrigin = () => {
   const mode = String(process.env.NEXT_ENV || process.env.NODE_ENV || "")
     .trim()
     .toLowerCase();
+
   const devOrigin = normalizeApiOrigin(process.env.NEXT_PUBLIC_DEV_URL);
   const centralOrigin = normalizeApiOrigin(process.env.NEXT_PUBLIC_CENTRAL_URL);
+
   return mode === "development"
     ? devOrigin || centralOrigin
     : centralOrigin || devOrigin;
@@ -31,10 +33,13 @@ const FORWARDED_HEADER_NAMES = [
 const isHttpsRequest = (request) =>
   String(request?.nextUrl?.protocol || "").toLowerCase() === "https:";
 
+/*
+ COOKIE NORMALIZATION */
+
 const splitSetCookieAttributes = (cookie) =>
   String(cookie || "")
     .split(";")
-    .map((part) => String(part || "").trim())
+    .map((p) => String(p || "").trim())
     .filter(Boolean);
 
 const normalizeSetCookie = (cookie, request) => {
@@ -42,54 +47,68 @@ const normalizeSetCookie = (cookie, request) => {
   if (!parts.length) return "";
 
   const [nameValue, ...attributes] = parts;
-  const normalizedAttributes = [];
+
+  const normalized = [];
   let hasPath = false;
   let hasSecure = false;
 
-  for (const attribute of attributes) {
-    const [rawName] = attribute.split("=");
-    const attributeName = String(rawName || "").trim().toLowerCase();
+  for (const attr of attributes) {
+    const [rawName] = attr.split("=");
+    const name = String(rawName || "").trim().toLowerCase();
 
-    if (!attributeName) continue;
-    if (attributeName === "domain") continue;
+    if (!name) continue;
 
-    if (attributeName === "path") {
+    /* rewrite domain instead of removing */
+    if (name === "domain") {
+      normalized.push(`Domain=${request.nextUrl.hostname}`);
+      continue;
+    }
+
+    if (name === "path") {
       hasPath = true;
-      normalizedAttributes.push("Path=/");
+      normalized.push("Path=/");
       continue;
     }
 
-    if (attributeName === "secure") {
+    if (name === "secure") {
       hasSecure = true;
-      normalizedAttributes.push("Secure");
+      normalized.push("Secure");
       continue;
     }
 
-    normalizedAttributes.push(attribute);
+    normalized.push(attr);
   }
 
-  if (!hasPath) {
-    normalizedAttributes.push("Path=/");
-  }
+  if (!hasPath) normalized.push("Path=/");
 
   if (isHttpsRequest(request) && !hasSecure) {
-    normalizedAttributes.push("Secure");
+    normalized.push("Secure");
   }
 
-  return [nameValue, ...normalizedAttributes].join("; ");
+  return [nameValue, ...normalized].join("; ");
 };
+
+/*
+ PATH UTIL
+*/
 
 const readPathFromParams = (params) => {
   const parts = Array.isArray(params?.path) ? params.path : [];
+
   return parts
-    .map((part) => String(part || "").trim())
+    .map((p) => String(p || "").trim())
     .filter(Boolean)
     .join("/");
 };
 
+/*
+ BODY*/
+
 const parseJsonBody = (rawBody) => {
   const text = String(rawBody || "").trim();
+
   if (!text) return {};
+
   try {
     return JSON.parse(text);
   } catch {
@@ -99,6 +118,9 @@ const parseJsonBody = (rawBody) => {
 
 const shouldSendBody = (method) =>
   !["GET", "HEAD"].includes(String(method || "").toUpperCase());
+
+/*
+ PRODUCT KEY */
 
 const getProductKey = (request, payload) => {
   return String(
@@ -112,11 +134,15 @@ const getProductKey = (request, payload) => {
     .toLowerCase();
 };
 
+/*
+ HEADERS*/
+
 const buildProxyHeaders = (request, productKey) => {
   const headers = new Headers();
 
   for (const name of FORWARDED_HEADER_NAMES) {
     const value = String(request.headers.get(name) || "").trim();
+
     if (value) headers.set(name, value);
   }
 
@@ -130,86 +156,61 @@ const buildProxyHeaders = (request, productKey) => {
         request.cookies.get("csrf_token")?.value ||
         ""
     ).trim();
+
     if (csrfToken) headers.set("x-csrf-token", csrfToken);
   }
 
   return headers;
 };
 
+/*
+ COOKIE FORWARD
+ */
+
 const forwardSetCookieHeaders = (request, upstream, response) => {
-  if (typeof upstream.headers.getSetCookie === "function") {
-    const cookies = upstream.headers.getSetCookie();
-    for (const cookie of cookies) {
-      const normalizedCookie = normalizeSetCookie(cookie, request);
-      if (normalizedCookie) {
-        response.headers.append("set-cookie", normalizedCookie);
-      }
-    }
-    return;
-  }
+  const raw = upstream.headers.get("set-cookie");
 
-  const combined = String(upstream.headers.get("set-cookie") || "").trim();
-  if (!combined) return;
+  if (!raw) return;
 
-  const cookies = [];
-  let current = "";
-  let inExpires = false;
-
-  for (let i = 0; i < combined.length; i += 1) {
-    const char = combined[i];
-    const lower = combined.slice(i, i + 8).toLowerCase();
-
-    if (!inExpires && lower === "expires=") {
-      inExpires = true;
-      current += combined.slice(i, i + 8);
-      i += 7;
-      continue;
-    }
-
-    if (inExpires && char === ";") {
-      inExpires = false;
-      current += char;
-      continue;
-    }
-
-    if (!inExpires && char === ",") {
-      const value = current.trim();
-      if (value) cookies.push(value);
-      current = "";
-      continue;
-    }
-
-    current += char;
-  }
-
-  const tail = current.trim();
-  if (tail) cookies.push(tail);
+  const cookies = raw.split(/,(?=[^;]+=[^;]+)/);
 
   for (const cookie of cookies) {
-    const normalizedCookie = normalizeSetCookie(cookie, request);
-    if (normalizedCookie) {
-      response.headers.append("set-cookie", normalizedCookie);
+    const normalized = normalizeSetCookie(cookie, request);
+
+    if (normalized) {
+      response.headers.append("set-cookie", normalized);
     }
   }
 };
 
+/*
+ RESPONSE*/
+
 const createProxyResponse = async (request, upstream) => {
-  const bodyText = await upstream.text();
-  const response = new NextResponse(bodyText, { status: upstream.status });
+  const body = await upstream.text();
+
+  const response = new NextResponse(body, {
+    status: upstream.status,
+  });
 
   const contentType = upstream.headers.get("content-type");
-  if (contentType) response.headers.set("content-type", contentType);
+
+  if (contentType) {
+    response.headers.set("content-type", contentType);
+  }
 
   forwardSetCookieHeaders(request, upstream, response);
 
-  const csrfFromHeader = String(
-    upstream.headers.get("x-csrf-token") || upstream.headers.get("csrf-token") || ""
+  const csrfHeader = String(
+    upstream.headers.get("x-csrf-token") ||
+      upstream.headers.get("csrf-token") ||
+      ""
   ).trim();
 
-  if (csrfFromHeader) {
+  if (csrfHeader) {
     response.cookies.set({
       name: "csrf_token",
-      value: csrfFromHeader,
+      value: csrfHeader,
       httpOnly: false,
       secure: isHttpsRequest(request),
       sameSite: "lax",
@@ -220,44 +221,60 @@ const createProxyResponse = async (request, upstream) => {
   return response;
 };
 
+/*
+ MAIN PROXY*/
+
 const handleProxy = async (request, context) => {
   if (!API_ORIGIN) {
     return NextResponse.json(
       {
         success: false,
-        error: { code: "API_ORIGIN_MISSING", message: "API origin is not configured" },
+        error: {
+          code: "API_ORIGIN_MISSING",
+          message: "API origin is not configured",
+        },
       },
       { status: 500 }
     );
   }
 
   const method = String(request.method || "GET").toUpperCase();
-  const resolvedParams = await Promise.resolve(context?.params).catch(() => ({}));
-  const pathKey = readPathFromParams(resolvedParams);
+
+  const params = await Promise.resolve(context?.params).catch(() => ({}));
+
+  const pathKey = readPathFromParams(params);
 
   if (!pathKey) {
     return NextResponse.json(
       {
         success: false,
-        error: { code: "INVALID_PROXY_PATH", message: "Missing API path" },
+        error: {
+          code: "INVALID_PROXY_PATH",
+          message: "Missing API path",
+        },
       },
       { status: 404 }
     );
   }
 
   const rawBody = shouldSendBody(method) ? await request.text() : "";
+
   const payload = parseJsonBody(rawBody);
+
   const productKey = getProductKey(request, payload);
 
   const headers = buildProxyHeaders(request, productKey);
+
   const upstreamUrl = `${API_ORIGIN}/api/${pathKey}${request.nextUrl.search}`;
 
   let upstream;
+
   try {
     upstream = await fetch(upstreamUrl, {
       method,
       headers,
       cache: "no-store",
+      credentials: "include",
       body: shouldSendBody(method) ? rawBody : undefined,
     });
   } catch {
@@ -275,6 +292,9 @@ const handleProxy = async (request, context) => {
 
   return createProxyResponse(request, upstream);
 };
+
+/*
+ HTTP METHODS*/
 
 export async function GET(request, context) {
   return handleProxy(request, context);
