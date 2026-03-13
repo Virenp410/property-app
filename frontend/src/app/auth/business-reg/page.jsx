@@ -32,6 +32,7 @@ import {
   setJsonCookie,
 } from "@/services/cookieStore";
 import { PRODUCT_KEY } from "@/lib/productKey";
+import { refreshAccessToken } from "@/lib/auth/apiClient";
 
 const EMPTY_FORM = {
   country_code: "91",
@@ -97,6 +98,8 @@ const getErrorMessage = (err, fallback) =>
   err?.response?.data?.message ||
   err?.message ||
   fallback;
+const getStatusCode = (err) => Number(err?.response?.status || 0);
+const isUnauthorizedError = (err) => getStatusCode(err) === 401;
 const normalizeCountryCode = (value) => String(value || "").replace("+", "").trim();
 const getCountryByCode = (code) => {
   const normalized = normalizeCountryCode(code);
@@ -192,6 +195,16 @@ function BusinessRegistrationPageContent() {
   const businessAutocompleteRef = useRef(null);
   const countryDropdownRef = useRef(null);
   const debouncedBusinessName = useDebounce(form.business_name, 350);
+
+  const retryWithSessionRefresh = useCallback(async (requestFactory) => {
+    try {
+      return await requestFactory();
+    } catch (err) {
+      if (!isUnauthorizedError(err)) throw err;
+      await refreshAccessToken();
+      return requestFactory();
+    }
+  }, []);
 
   const handoffToDealerDash = useCallback(() => {
     const authOrigin =
@@ -641,12 +654,14 @@ function BusinessRegistrationPageContent() {
       try {
         if (!active) return;
 
-        const profileRes = await api.get("/v1/profile/me", {
-          params: {
-            _t: Date.now(),
-          },
-          headers: { "x-product-key": PRODUCT_KEY },
-        });
+        const profileRes = await retryWithSessionRefresh(() =>
+          api.get("/v1/profile/me", {
+            params: {
+              _t: Date.now(),
+            },
+            headers: { "x-product-key": PRODUCT_KEY },
+          })
+        );
         const profilePayload = profileRes?.data || {};
         const profileData =
           profilePayload?.data && typeof profilePayload.data === "object"
@@ -661,7 +676,7 @@ function BusinessRegistrationPageContent() {
           handoffToDealerDash();
         }
       } catch (err) {
-        if (Number(err?.response?.status || 0) === 401) {
+        if (isUnauthorizedError(err)) {
           setSessionExpired(true);
           return;
         }
@@ -674,7 +689,7 @@ function BusinessRegistrationPageContent() {
     return () => {
       active = false;
     };
-  }, [handoffToDealerDash, router]);
+  }, [handoffToDealerDash, retryWithSessionRefresh, router]);
 
   useEffect(() => {
     if (sessionExpired) {
@@ -697,7 +712,9 @@ function BusinessRegistrationPageContent() {
       try {
         setBusinessLoading(true);
         setBusinessSuggestionError("");
-        const data = await getBusinessAutocomplete(debouncedBusinessName.trim());
+        const data = await retryWithSessionRefresh(() =>
+          getBusinessAutocomplete(debouncedBusinessName.trim())
+        );
         const suggestions = Array.isArray(data)
           ? data
           : Array.isArray(data?.businesses)
@@ -711,7 +728,11 @@ function BusinessRegistrationPageContent() {
         setBusinessFetchedOnce(true);
       } catch (err) {
         const message = String(err?.message || "").toLowerCase();
-        if (message.includes("session expired") || message.includes("login again")) {
+        if (
+          isUnauthorizedError(err) ||
+          message.includes("session expired") ||
+          message.includes("login again")
+        ) {
           setSessionExpired(true);
           setBusinessSuggestions([]);
           setBusinessSuggestionError("Session expired. Please login again.");
@@ -726,7 +747,7 @@ function BusinessRegistrationPageContent() {
     };
 
     fetchBusinessSuggestions();
-  }, [debouncedBusinessName, t, sessionExpired]);
+  }, [debouncedBusinessName, retryWithSessionRefresh, t, sessionExpired]);
 
   useEffect(() => {
     const closeOnOutside = (event) => {
@@ -753,7 +774,7 @@ function BusinessRegistrationPageContent() {
     const fetchCategories = async () => {
       try {
         setCategoriesLoading(true);
-        const data = await getCategories();
+        const data = await retryWithSessionRefresh(() => getCategories());
         const categoryList = Array.isArray(data?.categories)
           ? data.categories
           : Array.isArray(data?.data?.categories)
@@ -763,7 +784,7 @@ function BusinessRegistrationPageContent() {
           : [];
         setCategories(categoryList);
       } catch (err) {
-        if (Number(err?.response?.status || 0) === 401) {
+        if (isUnauthorizedError(err)) {
           setSessionExpired(true);
         }
         setCategories([]);
@@ -773,7 +794,7 @@ function BusinessRegistrationPageContent() {
     };
 
     fetchCategories();
-  }, []);
+  }, [retryWithSessionRefresh]);
 
   useEffect(() => {
     if (!sessionExpired) return;
@@ -1067,7 +1088,7 @@ function BusinessRegistrationPageContent() {
     }
 
     try {
-      const response = await registerBusiness(payload);
+      const response = await retryWithSessionRefresh(() => registerBusiness(payload));
       const data = response?.data || {};
       const branch = String(data?.branch_id || data?.default_branch_id || "");
       if (branch) setBranchId(branch);
@@ -1081,7 +1102,12 @@ function BusinessRegistrationPageContent() {
 
       handoffToDealerDash();
     } catch (err) {
-      setErrorMessage(getErrorMessage(err, t.businessRegisterError));
+      if (isUnauthorizedError(err)) {
+        setSessionExpired(true);
+        setErrorMessage("Session expired. Please login again.");
+      } else {
+        setErrorMessage(getErrorMessage(err, t.businessRegisterError));
+      }
     } finally {
       setLoading(false);
       submitLockRef.current = false;
@@ -1916,4 +1942,3 @@ function WizardStepBadge({ title, active, done, locked, onClick }) {
     </button>
   );
 }
-
