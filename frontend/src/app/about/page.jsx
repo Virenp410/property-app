@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function AboutRedirectPage() {
-  redirect("/about-us");
+ <h1>kookookodkokwokdwkowd</h1>
 }

@@ -796,14 +796,6 @@ function BusinessRegistrationPageContent() {
     fetchCategories();
   }, [retryWithSessionRefresh]);
 
-  useEffect(() => {
-    if (!sessionExpired) return;
-    setErrorMessage("Session expired. Please login again.");
-    const timer = setTimeout(() => {
-      router.replace("/auth/login");
-    }, 900);
-    return () => clearTimeout(timer);
-  }, [sessionExpired, router]);
 
   const requestBusinessEmailOtp = async () => {
     if (!isValidEmail || sendingEmailOtp || emailVerified) return;
