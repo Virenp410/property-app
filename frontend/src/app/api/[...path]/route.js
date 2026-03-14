@@ -346,5 +346,3 @@ export async function OPTIONS(request, context) {
 export async function HEAD(request, context) {
   return handleProxy(request, context);
 }
-
-route.js
