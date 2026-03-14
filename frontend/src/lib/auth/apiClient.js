@@ -17,6 +17,38 @@ const apiClient = axios.create({
 let accessToken = null;
 let refreshPromise = null;
 
+const setBrowserCookie = (name, value) => {
+  if (typeof document === "undefined") return;
+  const safeValue = encodeURIComponent(String(value ?? ""));
+  const secureFlag =
+    typeof window !== "undefined" && window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `${name}=${safeValue}; Path=/; SameSite=Lax${secureFlag}`;
+};
+
+const removeBrowserCookie = (name) => {
+  if (typeof document === "undefined") return;
+  document.cookie = `${name}=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/; SameSite=Lax`;
+};
+
+const storeCsrfToken = (token) => {
+  const nextValue = String(token || "").trim();
+  if (!nextValue) return;
+  setBrowserCookie("csrf_token_auto", nextValue);
+  removeBrowserCookie("csrf_token");
+};
+
+const pickCsrfFromResponse = (response) => {
+  const headers = response?.headers || {};
+  const headerToken = String(headers["x-csrf-token"] || headers["csrf-token"] || "").trim();
+  if (headerToken) return headerToken;
+  return pickTokenValue(response?.data || {}, ["csrf_token", "csrfToken"]);
+};
+
+const captureCsrfFromResponse = (response) => {
+  const csrfToken = pickCsrfFromResponse(response);
+  if (csrfToken) storeCsrfToken(csrfToken);
+};
+
 const PUBLIC_ROUTE_HINTS = [
   "/v1/otp/",
   "/auth/email/send-otp",
@@ -73,6 +105,8 @@ export const refreshAccessToken = async () => {
     }
   );
 
+  captureCsrfFromResponse(response);
+
   const token = applyAuthPayload(response?.data || {});
   if (!token) {
     throw new Error("No access token returned from refresh");
@@ -128,7 +162,10 @@ apiClient.interceptors.request.use(async (config) => {
 });
 
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    captureCsrfFromResponse(response);
+    return response;
+  },
   async (error) => {
     const originalRequest = error?.config || {};
     const status = Number(error?.response?.status || 0);
@@ -162,3 +199,5 @@ apiClient.interceptors.response.use(
 );
 
 export default apiClient;
+
+// auto-app  apicliend.js

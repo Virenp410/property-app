@@ -150,6 +150,29 @@ const buildProxyHeaders = (request, productKey) => {
     headers.set("x-product-key", productKey);
   }
 
+  const ensureCookie = (cookieHeader, name, value) => {
+    const token = `${name}=`;
+    const hasCookie = cookieHeader
+      .split(";")
+      .map((part) => part.trim())
+      .some((part) => part.startsWith(token));
+    if (hasCookie || !value) return cookieHeader;
+    return cookieHeader ? `${cookieHeader}; ${token}${value}` : `${token}${value}`;
+  };
+
+  // Normalize auth cookies so upstream can read legacy names.
+  const csrfAuto = String(request.cookies.get("csrf_token_auto")?.value || "").trim();
+  const refreshAuto = String(request.cookies.get("refresh_token_auto")?.value || "").trim();
+  const accessAuto = String(request.cookies.get("access_token_auto")?.value || "").trim();
+  if (csrfAuto || refreshAuto || accessAuto) {
+    const originalCookie = String(headers.get("cookie") || "").trim();
+    let nextCookie = originalCookie;
+    nextCookie = ensureCookie(nextCookie, "csrf_token", csrfAuto);
+    nextCookie = ensureCookie(nextCookie, "refresh_token", refreshAuto);
+    nextCookie = ensureCookie(nextCookie, "access_token", accessAuto);
+    if (nextCookie) headers.set("cookie", nextCookie);
+  }
+
   if (!headers.get("x-csrf-token")) {
     const csrfToken = String(
       request.cookies.get("csrf_token_auto")?.value ||
@@ -323,3 +346,5 @@ export async function OPTIONS(request, context) {
 export async function HEAD(request, context) {
   return handleProxy(request, context);
 }
+
+route.js
