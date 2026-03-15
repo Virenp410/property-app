@@ -22,6 +22,7 @@ const resolveApiOrigin = () => {
 
 const API_ORIGIN = resolveApiOrigin();
 const isProd = process.env.NODE_ENV === "production";
+const cookieDomain = isProd ? ".seaneb.com" : "";
 const cookieOptions = {
   httpOnly: true,
   secure: isProd,
@@ -29,8 +30,8 @@ const cookieOptions = {
   path: "/",
 };
 
-if (isProd) {
-  cookieOptions.domain = ".seaneb.app";
+if (cookieDomain) {
+  cookieOptions.domain = cookieDomain;
 }
 
 const FORWARDED_HEADER_NAMES = [
