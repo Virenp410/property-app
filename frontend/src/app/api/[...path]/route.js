@@ -22,7 +22,7 @@ const resolveApiOrigin = () => {
 
 const API_ORIGIN = resolveApiOrigin();
 const isProd = process.env.NODE_ENV === "production";
-const cookieDomain = isProd ? ".seaneb.com" : "";
+const cookieDomain = isProd ? String(process.env.COOKIE_DOMAIN || "").trim() : "";
 const cookieOptions = {
   httpOnly: true,
   secure: isProd,
