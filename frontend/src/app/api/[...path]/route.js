@@ -21,6 +21,17 @@ const resolveApiOrigin = () => {
 };
 
 const API_ORIGIN = resolveApiOrigin();
+const isProd = process.env.NODE_ENV === "production";
+const cookieOptions = {
+  httpOnly: true,
+  secure: isProd,
+  sameSite: isProd ? "none" : "lax",
+  path: "/",
+};
+
+if (isProd) {
+  cookieOptions.domain = ".seaneb.app";
+}
 
 const FORWARDED_HEADER_NAMES = [
   "content-type",
@@ -42,21 +53,36 @@ const splitSetCookieAttributes = (cookie) =>
     .map((p) => String(p || "").trim())
     .filter(Boolean);
 
+const TOKEN_COOKIE_NAMES = new Set(["refresh_token_auto", "csrf_token_auto"]);
+
 const normalizeSetCookie = (cookie, request) => {
   const parts = splitSetCookieAttributes(cookie);
   if (!parts.length) return "";
 
   const [nameValue, ...attributes] = parts;
+  const cookieName = String(nameValue.split("=")[0] || "").trim();
+  const isTokenCookie = TOKEN_COOKIE_NAMES.has(cookieName);
 
   const normalized = [];
   let hasPath = false;
   let hasSecure = false;
+  let hasHttpOnly = false;
 
   for (const attr of attributes) {
     const [rawName] = attr.split("=");
     const name = String(rawName || "").trim().toLowerCase();
 
     if (!name) continue;
+
+    if (isTokenCookie) {
+      if (name === "domain") continue;
+      if (name === "path") continue;
+      if (name === "secure") continue;
+      if (name === "httponly") continue;
+      if (name === "samesite") continue;
+      normalized.push(attr);
+      continue;
+    }
 
     /* rewrite domain instead of removing */
     if (name === "domain") {
@@ -76,13 +102,26 @@ const normalizeSetCookie = (cookie, request) => {
       continue;
     }
 
+    if (name === "httponly") {
+      hasHttpOnly = true;
+      normalized.push("HttpOnly");
+      continue;
+    }
+
     normalized.push(attr);
   }
 
-  if (!hasPath) normalized.push("Path=/");
-
-  if (isHttpsRequest(request) && !hasSecure) {
-    normalized.push("Secure");
+  if (isTokenCookie) {
+    normalized.push(`Path=${cookieOptions.path}`);
+    normalized.push(`SameSite=${cookieOptions.sameSite === "none" ? "None" : "Lax"}`);
+    if (cookieOptions.secure) normalized.push("Secure");
+    if (cookieOptions.httpOnly && !hasHttpOnly) normalized.push("HttpOnly");
+    if (cookieOptions.domain) normalized.push(`Domain=${cookieOptions.domain}`);
+  } else {
+    if (!hasPath) normalized.push("Path=/");
+    if (isHttpsRequest(request) && !hasSecure) {
+      normalized.push("Secure");
+    }
   }
 
   return [nameValue, ...normalized].join("; ");
