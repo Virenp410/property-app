@@ -1,4 +1,4 @@
-import api from "./api";
+import api from "@/lib/auth/apiClient";
 import { getActiveProductKey } from "@/lib/productKey";
 
 const toTitleCase = (value) =>

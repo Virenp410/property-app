@@ -7,7 +7,7 @@ import {
   sendEmailOtp,
   verifyEmailOtp,
 } from "@/services/otp.services";
-import { setSessionTokens } from "@/services/api";
+import { setAccessToken } from "@/lib/auth/apiClient";
 import {
   getJsonCookie,
   setCookie,
@@ -102,11 +102,8 @@ export default function useOtp({ onSuccess, t }) {
       const hasCsrf = csrfToken.length > 10;
       const hasSessionHint = hasAccess || hasCsrf;
 
-      if (hasAccess || hasCsrf) {
-        setSessionTokens({
-          ...(hasAccess ? { access_token: accessToken } : {}),
-          ...(hasCsrf ? { csrf_token: csrfToken } : {}),
-        });
+      if (hasAccess) {
+        setAccessToken(accessToken);
       }
 
       onSuccess?.({

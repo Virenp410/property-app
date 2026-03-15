@@ -6,6 +6,8 @@ export default function OtpInput({
   length = 4,
   onComplete,
   resetKey,
+  wrapperClassName = "",
+  inputClassName = "",
 }) {
   const [otp, setOtp] = useState(Array(length).fill(""));
   const inputsRef = useRef([]);
@@ -55,7 +57,9 @@ export default function OtpInput({
   };
 
   return (
-    <div className="my-6 flex justify-center gap-[14px]">
+    <div
+      className={`my-6 flex justify-center gap-[14px] ${wrapperClassName}`.trim()}
+    >
       {otp.map((digit, i) => (
         <input
           key={i}
@@ -68,7 +72,7 @@ export default function OtpInput({
           value={digit}
           onChange={(e) => handleChange(e.target.value, i)}
           onKeyDown={(e) => handleKeyDown(e, i)}
-          className="h-[52px] w-[52px] rounded-[12px] border border-[#dcdcdc] text-center text-[18px] [-webkit-text-security:disc] [text-security:disc] focus:border-[var(--auth-border-strong)] focus:outline-none"
+          className={`h-[52px] w-[52px] rounded-[12px] border border-[#dcdcdc] text-center text-[18px] [-webkit-text-security:disc] [text-security:disc] focus:border-[var(--auth-border-strong)] focus:outline-none ${inputClassName}`.trim()}
         />
       ))}
     </div>

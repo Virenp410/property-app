@@ -15,7 +15,7 @@ import TermsConditionsModal from "@/components/TermsConditionsModal";
 
 import { signupUser } from "@/services/auth.services";
 import { sendEmailOtp, sendOtp } from "@/services/otp.services";
-import { setSessionTokens } from "@/services/api";
+import { setAccessToken } from "@/lib/auth/apiClient";
 import { PRODUCT_KEY } from "@/lib/productKey";
 import { notifyParentAndClose } from "@/lib/auth/popupAuthBridge";
 import { readBridgeToken, resolveWebSsoRedirectUrl } from "@/services/sso.services";
@@ -432,11 +432,8 @@ function RegistrationFormContent() {
       const hasCsrfToken =
         typeof csrfToken === "string" && csrfToken.length > 10;
 
-      if (hasAccessToken || hasCsrfToken) {
-        setSessionTokens({
-          ...(hasAccessToken ? { access_token: accessToken } : {}),
-          ...(hasCsrfToken ? { csrf_token: csrfToken } : {}),
-        });
+      if (hasAccessToken) {
+        setAccessToken(accessToken);
       }
 
       const fullName = `${String(form.firstname || "").trim()} ${String(form.lastname || "").trim()}`.trim();
@@ -711,4 +708,3 @@ export default function RegistrationForm() {
     </Suspense>
   );
 }
-

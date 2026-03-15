@@ -1,4 +1,4 @@
-import api from "./api";
+import api from "@/lib/auth/apiClient";
 import { PRODUCT_KEY } from "@/lib/productKey";
 
 const getProductKey = (value) => String(value || PRODUCT_KEY || "").trim();

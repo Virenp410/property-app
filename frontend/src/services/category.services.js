@@ -1,4 +1,4 @@
-import api from "./api";
+import api from "@/lib/auth/apiClient";
 import { PRODUCT_KEY } from "@/lib/productKey";
 
 const readList = (payload) => payload?.data || [];

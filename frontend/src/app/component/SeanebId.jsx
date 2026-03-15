@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { checkSeanebId } from "../../services/auth.services";
+import { checkSeanebId } from "../services/auth.services";
 
 export default function SeanebIdField({
   value,

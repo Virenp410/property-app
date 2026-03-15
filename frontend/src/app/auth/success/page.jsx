@@ -8,11 +8,12 @@ import AuthLayout from "@/components/AuthLayout";
 import useTranslation from "@/hooks/useTranslation";
 import useAppLang from "@/hooks/useAppLang";
 import successAnim from "@/constants/lottieyfile/Checked.json";
-import { clearServerSession } from "@/services/api";
+import { logout } from "@/lib/auth/authService";
 import { getCurrentUserProfile } from "@/services/user.services";
 import { getCookie, removeCookie, setCookie } from "@/services/cookieStore";
 import { notifyParentAndClose } from "@/lib/auth/popupAuthBridge";
 import { resolveWebSsoRedirectUrl } from "@/services/sso.services";
+import { activateSsoLock, releaseSsoLock } from "@/lib/auth/ssoLock";
 
 function SuccessPageContent() {
   const router = useRouter();
@@ -25,8 +26,18 @@ function SuccessPageContent() {
 
   useEffect(() => {
     let active = true;
+    let didRun = false;
+
+    const initialBridgeTokenFromQuery = String(searchParams?.get("bridge_token") || "").trim();
+    const initialBridgeTokenFromStore = String(getCookie("signup_bridge_token") || "").trim();
+    const hasBridgeToken = Boolean(initialBridgeTokenFromQuery || initialBridgeTokenFromStore);
+
+    if (hasBridgeToken) {
+      activateSsoLock();
+    }
 
     const timer = setTimeout(async () => {
+      didRun = true;
       try {
         await getCurrentUserProfile();
         if (!active) return;
@@ -61,14 +72,21 @@ function SuccessPageContent() {
         if (!active) return;
         removeCookie("signup_bridge_token");
         removeCookie("post_auth_redirect");
-        await clearServerSession();
+        await logout();
         router.push("/auth/login");
+      } finally {
+        if (hasBridgeToken) {
+          releaseSsoLock();
+        }
       }
     }, 2200);
 
     return () => {
       active = false;
       clearTimeout(timer);
+      if (hasBridgeToken && !didRun) {
+        releaseSsoLock();
+      }
     };
   }, [router, searchParams, webAppUrl]);
 

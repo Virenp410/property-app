@@ -1,4 +1,4 @@
-import api from "./api";
+import api from "@/lib/auth/apiClient";
 
 const toText = (value) => String(value || "").trim();
 

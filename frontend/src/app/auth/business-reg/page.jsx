@@ -14,7 +14,7 @@ import useTranslation from "@/hooks/useTranslation";
 import useAppLang from "@/hooks/useAppLang";
 import useDebounce from "@/hooks/useDebaunce";
 import useOtp from "@/hooks/useOtp";
-import api from "@/services/api";
+import api from "@/lib/auth/apiClient";
 import { sendEmailOtp, sendOtp } from "@/services/otp.services";
 import {
   getBusinessAutocomplete,
@@ -132,6 +132,7 @@ const BIZ_HELPER_SUCCESS_CLASS =
   "mt-[7px] text-[12px] text-[var(--color-success-strong)]";
 const BUSINESS_SEANEB_VERIFIED_COOKIE = "business_seaneb_id_verified";
 const VERIFIED_BUSINESS_SEANEB_ID_COOKIE = "verified_business_seaneb_id";
+const SESSION_EXPIRED_REDIRECT_DELAY_MS = 20 * 60 * 1000;
 
 export default function BusinessRegistrationPage() {
   return (
@@ -677,7 +678,6 @@ function BusinessRegistrationPageContent() {
         }
       } catch (err) {
         if (isUnauthorizedError(err)) {
-          setSessionExpired(true);
           return;
         }
       } finally {
@@ -728,12 +728,7 @@ function BusinessRegistrationPageContent() {
         setBusinessFetchedOnce(true);
       } catch (err) {
         const message = String(err?.message || "").toLowerCase();
-        if (
-          isUnauthorizedError(err) ||
-          message.includes("session expired") ||
-          message.includes("login again")
-        ) {
-          setSessionExpired(true);
+        if (message.includes("session expired") || message.includes("login again")) {
           setBusinessSuggestions([]);
           setBusinessSuggestionError("Session expired. Please login again.");
           return;
@@ -784,9 +779,6 @@ function BusinessRegistrationPageContent() {
           : [];
         setCategories(categoryList);
       } catch (err) {
-        if (isUnauthorizedError(err)) {
-          setSessionExpired(true);
-        }
         setCategories([]);
       } finally {
         setCategoriesLoading(false);
@@ -796,6 +788,14 @@ function BusinessRegistrationPageContent() {
     fetchCategories();
   }, [retryWithSessionRefresh]);
 
+  useEffect(() => {
+    if (!sessionExpired) return;
+    setErrorMessage("Session expired. Please login again.");
+    const timer = setTimeout(() => {
+      router.replace("/auth/login");
+    }, SESSION_EXPIRED_REDIRECT_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [sessionExpired, router]);
 
   const requestBusinessEmailOtp = async () => {
     if (!isValidEmail || sendingEmailOtp || emailVerified) return;

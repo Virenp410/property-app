@@ -1,4 +1,4 @@
-import api from "./api";
+import api from "@/lib/auth/apiClient";
 import { PRODUCT_KEY } from "@/lib/productKey";
 import { getJsonCookie } from "./cookieStore";
 
@@ -72,4 +72,3 @@ export const verifyEmailOtp = ({ email, otp, purpose = 1 }) => {
     { withCredentials: false }
   );
 };
-

@@ -1,4 +1,4 @@
-import api from "./api";
+import api from "@/lib/auth/apiClient";
 
 export const signupUser = async (payload) => {
   const response = await api.post("/v1/user/signup", payload);
