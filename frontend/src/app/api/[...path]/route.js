@@ -8,7 +8,7 @@ const normalizeApiOrigin = (value) =>
     .replace(/\/api$/i, "");
 
 const resolveApiOrigin = () => {
-  const mode = String(process.env.NEXT_ENV )
+  const mode = String(process.env.NEXT_ENV || process.env.NODE_ENV || "")
     .trim()
     .toLowerCase();
 
@@ -22,7 +22,13 @@ const resolveApiOrigin = () => {
 
 const API_ORIGIN = resolveApiOrigin();
 const isProd = process.env.NODE_ENV === "production";
-const cookieDomain = isProd ? String(process.env.COOKIE_DOMAIN || "").trim() : "";
+const normalizeCookieDomain = (value) => {
+  const domain = String(value || "").trim();
+  if (!domain) return "";
+  if (domain === "localhost") return "";
+  return domain;
+};
+const cookieDomain = isProd ? normalizeCookieDomain(process.env.COOKIE_DOMAIN) : "";
 const cookieOptions = {
   httpOnly: true,
   secure: isProd,
