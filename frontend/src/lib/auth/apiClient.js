@@ -54,6 +54,19 @@ const readFirstCookie = (names) => {
 
 let accessToken = null;
 let refreshPromise = null;
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null, csrf = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve({ token, csrf });
+    }
+  });
+  failedQueue = [];
+};
 
 const pickCsrfFromResponse = (response) => {
   const headers = response?.headers || {};
@@ -311,19 +324,45 @@ apiClient.interceptors.response.use(
 
     originalRequest._authRetryCount = retryCount + 1;
 
+    if (isRefreshing) {
+      return new Promise((resolve, reject) => {
+        failedQueue.push({ resolve, reject });
+      })
+        .then(({ token, csrf }) => {
+          originalRequest.headers = originalRequest.headers || {};
+          const productKey = getStableProductKey();
+          if (productKey && !originalRequest.headers["x-product-key"]) {
+            originalRequest.headers["x-product-key"] = productKey;
+          }
+          if (token) originalRequest.headers.Authorization = `Bearer ${token}`;
+          if (csrf) originalRequest.headers["x-csrf-token"] = csrf;
+          return apiClient(originalRequest);
+        })
+        .catch((refreshError) => {
+          handleRefreshError(refreshError);
+          return Promise.reject(refreshError);
+        });
+    }
+
+    isRefreshing = true;
+
     try {
       const { token, csrf } = await refreshAccessToken();
+      processQueue(null, token, csrf);
       originalRequest.headers = originalRequest.headers || {};
       const productKey = getStableProductKey();
       if (productKey && !originalRequest.headers["x-product-key"]) {
         originalRequest.headers["x-product-key"] = productKey;
       }
-      originalRequest.headers.Authorization = `Bearer ${token}`;
+      if (token) originalRequest.headers.Authorization = `Bearer ${token}`;
       if (csrf) originalRequest.headers["x-csrf-token"] = csrf;
       return apiClient(originalRequest);
     } catch (refreshError) {
+      processQueue(refreshError, null, null);
       handleRefreshError(refreshError);
       return Promise.reject(refreshError);
+    } finally {
+      isRefreshing = false;
     }
   }
 );
