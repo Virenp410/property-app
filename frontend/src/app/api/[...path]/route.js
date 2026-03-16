@@ -11,13 +11,11 @@ const resolveApiOrigin = () => {
   const mode = String(process.env.NEXT_ENV || process.env.NODE_ENV || "")
     .trim()
     .toLowerCase();
-
   const devOrigin = normalizeApiOrigin(process.env.NEXT_PUBLIC_DEV_URL);
   const centralOrigin = normalizeApiOrigin(process.env.NEXT_PUBLIC_CENTRAL_URL);
-
   return mode === "development"
-    ? devOrigin 
-    : centralOrigin;
+    ? devOrigin || centralOrigin
+    : centralOrigin || devOrigin;
 };
 
 const API_ORIGIN = resolveApiOrigin();
@@ -51,110 +49,65 @@ const FORWARDED_HEADER_NAMES = [
 const isHttpsRequest = (request) =>
   String(request?.nextUrl?.protocol || "").toLowerCase() === "https:";
 
-/*
- COOKIE NORMALIZATION */
+const isTokenCookieName = (name) => {
+  const key = String(name || "").trim();
+  if (!key) return false;
+  if (key === "refresh_token_auto" || key === "csrf_token_auto") return true;
+  if (key === "refresh_token" || key === "csrf_token") return true;
+  if (key.startsWith("refresh_token_") || key.startsWith("csrf_token_")) return true;
+  return false;
+};
 
 const splitSetCookieAttributes = (cookie) =>
   String(cookie || "")
     .split(";")
-    .map((p) => String(p || "").trim())
+    .map((part) => String(part || "").trim())
     .filter(Boolean);
 
-const TOKEN_COOKIE_NAMES = new Set(["refresh_token_auto", "csrf_token_auto"]);
-
-const normalizeSetCookie = (cookie, request) => {
+const normalizeSetCookie = (cookie) => {
   const parts = splitSetCookieAttributes(cookie);
   if (!parts.length) return "";
 
   const [nameValue, ...attributes] = parts;
   const cookieName = String(nameValue.split("=")[0] || "").trim();
-  const isTokenCookie = TOKEN_COOKIE_NAMES.has(cookieName);
+  if (!isTokenCookieName(cookieName)) return cookie;
 
   const normalized = [];
-  let hasPath = false;
-  let hasSecure = false;
-  let hasHttpOnly = false;
 
   for (const attr of attributes) {
     const [rawName] = attr.split("=");
     const name = String(rawName || "").trim().toLowerCase();
-
     if (!name) continue;
 
-    if (isTokenCookie) {
-      if (name === "domain") continue;
-      if (name === "path") continue;
-      if (name === "secure") continue;
-      if (name === "httponly") continue;
-      if (name === "samesite") continue;
-      normalized.push(attr);
-      continue;
-    }
-
-    /* rewrite domain instead of removing */
-    if (name === "domain") {
-      normalized.push(`Domain=${request.nextUrl.hostname}`);
-      continue;
-    }
-
-    if (name === "path") {
-      hasPath = true;
-      normalized.push("Path=/");
-      continue;
-    }
-
-    if (name === "secure") {
-      hasSecure = true;
-      normalized.push("Secure");
-      continue;
-    }
-
-    if (name === "httponly") {
-      hasHttpOnly = true;
-      normalized.push("HttpOnly");
-      continue;
-    }
+    if (name === "domain") continue;
+    if (name === "path") continue;
+    if (name === "secure") continue;
+    if (name === "httponly") continue;
+    if (name === "samesite") continue;
 
     normalized.push(attr);
   }
 
-  if (isTokenCookie) {
-    normalized.push(`Path=${cookieOptions.path}`);
-    normalized.push(`SameSite=${cookieOptions.sameSite === "none" ? "None" : "Lax"}`);
-    if (cookieOptions.secure) normalized.push("Secure");
-    if (cookieOptions.httpOnly && !hasHttpOnly) normalized.push("HttpOnly");
-    if (cookieOptions.domain) normalized.push(`Domain=${cookieOptions.domain}`);
-  } else {
-    if (!hasPath) normalized.push("Path=/");
-    if (isHttpsRequest(request) && !hasSecure) {
-      normalized.push("Secure");
-    }
-  }
+  normalized.push(`Path=${cookieOptions.path}`);
+  normalized.push(`SameSite=${cookieOptions.sameSite === "none" ? "None" : "Lax"}`);
+  if (cookieOptions.secure) normalized.push("Secure");
+  if (cookieOptions.httpOnly) normalized.push("HttpOnly");
+  if (cookieOptions.domain) normalized.push(`Domain=${cookieOptions.domain}`);
 
   return [nameValue, ...normalized].join("; ");
 };
 
-/*
- PATH UTIL
-*/
-
 const readPathFromParams = (params) => {
   const parts = Array.isArray(params?.path) ? params.path : [];
-
   return parts
-    .map((p) => String(p || "").trim())
+    .map((part) => String(part || "").trim())
     .filter(Boolean)
     .join("/");
 };
 
-/*
- BODY*/
-
 const parseJsonBody = (rawBody) => {
   const text = String(rawBody || "").trim();
-
   if (!text) return {};
-
   try {
     return JSON.parse(text);
   } catch {
@@ -164,9 +117,6 @@ const parseJsonBody = (rawBody) => {
 
 const shouldSendBody = (method) =>
   !["GET", "HEAD"].includes(String(method || "").toUpperCase());
-
-/*
- PRODUCT KEY */
 
 const getProductKey = (request, payload) => {
   return String(
@@ -180,15 +130,11 @@ const getProductKey = (request, payload) => {
     .toLowerCase();
 };
 
-/*
- HEADERS*/
-
 const buildProxyHeaders = (request, productKey) => {
   const headers = new Headers();
 
   for (const name of FORWARDED_HEADER_NAMES) {
     const value = String(request.headers.get(name) || "").trim();
-
     if (value) headers.set(name, value);
   }
 
@@ -196,90 +142,89 @@ const buildProxyHeaders = (request, productKey) => {
     headers.set("x-product-key", productKey);
   }
 
-  const ensureCookie = (cookieHeader, name, value) => {
-    const token = `${name}=`;
-    const hasCookie = cookieHeader
-      .split(";")
-      .map((part) => part.trim())
-      .some((part) => part.startsWith(token));
-    if (hasCookie || !value) return cookieHeader;
-    return cookieHeader ? `${cookieHeader}; ${token}${value}` : `${token}${value}`;
-  };
-
-  // Normalize auth cookies so upstream can read legacy names.
-  const csrfAuto = String(request.cookies.get("csrf_token_auto")?.value || "").trim();
-  const refreshAuto = String(request.cookies.get("refresh_token_auto")?.value || "").trim();
-  const accessAuto = String(request.cookies.get("access_token_auto")?.value || "").trim();
-  if (csrfAuto || refreshAuto || accessAuto) {
-    const originalCookie = String(headers.get("cookie") || "").trim();
-    let nextCookie = originalCookie;
-    nextCookie = ensureCookie(nextCookie, "csrf_token", csrfAuto);
-    nextCookie = ensureCookie(nextCookie, "refresh_token", refreshAuto);
-    nextCookie = ensureCookie(nextCookie, "access_token", accessAuto);
-    if (nextCookie) headers.set("cookie", nextCookie);
-  }
-
   if (!headers.get("x-csrf-token")) {
     const csrfToken = String(
-      request.cookies.get("csrf_token_auto")?.value ||
+      (productKey ? request.cookies.get(`csrf_token_${productKey}`)?.value : "") ||
+        request.cookies.get("csrf_token_auto")?.value ||
         request.cookies.get("csrf_token")?.value ||
         ""
     ).trim();
-
     if (csrfToken) headers.set("x-csrf-token", csrfToken);
   }
 
   return headers;
 };
 
-/*
- COOKIE FORWARD
- */
+const forwardSetCookieHeaders = (upstream, response) => {
+  if (typeof upstream.headers.getSetCookie === "function") {
+    const cookies = upstream.headers.getSetCookie();
+    for (const cookie of cookies) {
+      const normalized = normalizeSetCookie(cookie);
+      if (normalized) response.headers.append("set-cookie", normalized);
+    }
+    return;
+  }
 
-const forwardSetCookieHeaders = (request, upstream, response) => {
-  const raw = upstream.headers.get("set-cookie");
+  const combined = String(upstream.headers.get("set-cookie") || "").trim();
+  if (!combined) return;
 
-  if (!raw) return;
+  const cookies = [];
+  let current = "";
+  let inExpires = false;
 
-  const cookies = raw.split(/,(?=[^;]+=[^;]+)/);
+  for (let i = 0; i < combined.length; i += 1) {
+    const char = combined[i];
+    const lower = combined.slice(i, i + 8).toLowerCase();
+
+    if (!inExpires && lower === "expires=") {
+      inExpires = true;
+      current += combined.slice(i, i + 8);
+      i += 7;
+      continue;
+    }
+
+    if (inExpires && char === ";") {
+      inExpires = false;
+      current += char;
+      continue;
+    }
+
+    if (!inExpires && char === ",") {
+      const value = current.trim();
+      if (value) cookies.push(value);
+      current = "";
+      continue;
+    }
+
+    current += char;
+  }
+
+  const tail = current.trim();
+  if (tail) cookies.push(tail);
 
   for (const cookie of cookies) {
-    const normalized = normalizeSetCookie(cookie, request);
-
-    if (normalized) {
-      response.headers.append("set-cookie", normalized);
-    }
+    const normalized = normalizeSetCookie(cookie);
+    if (normalized) response.headers.append("set-cookie", normalized);
   }
 };
 
-/*
- RESPONSE*/
-
 const createProxyResponse = async (request, upstream) => {
-  const body = await upstream.text();
-
-  const response = new NextResponse(body, {
-    status: upstream.status,
-  });
+  const bodyText = await upstream.text();
+  const response = new NextResponse(bodyText, { status: upstream.status });
 
   const contentType = upstream.headers.get("content-type");
+  if (contentType) response.headers.set("content-type", contentType);
 
-  if (contentType) {
-    response.headers.set("content-type", contentType);
-  }
+  forwardSetCookieHeaders(upstream, response);
 
-  forwardSetCookieHeaders(request, upstream, response);
-
-  const csrfHeader = String(
-    upstream.headers.get("x-csrf-token") ||
-      upstream.headers.get("csrf-token") ||
-      ""
+  const csrfFromHeader = String(
+    upstream.headers.get("x-csrf-token") || upstream.headers.get("csrf-token") || ""
   ).trim();
 
-  if (csrfHeader) {
+  if (csrfFromHeader) {
     response.cookies.set({
       name: "csrf_token",
-      value: csrfHeader,
+      value: csrfFromHeader,
       httpOnly: false,
       secure: isHttpsRequest(request),
       sameSite: "lax",
@@ -290,60 +235,44 @@ const createProxyResponse = async (request, upstream) => {
   return response;
 };
 
-/*
- MAIN PROXY*/
-
 const handleProxy = async (request, context) => {
   if (!API_ORIGIN) {
     return NextResponse.json(
       {
         success: false,
-        error: {
-          code: "API_ORIGIN_MISSING",
-          message: "API origin is not configured",
-        },
+        error: { code: "API_ORIGIN_MISSING", message: "API origin is not configured" },
       },
       { status: 500 }
     );
   }
 
   const method = String(request.method || "GET").toUpperCase();
-
-  const params = await Promise.resolve(context?.params).catch(() => ({}));
-
-  const pathKey = readPathFromParams(params);
+  const resolvedParams = await Promise.resolve(context?.params).catch(() => ({}));
+  const pathKey = readPathFromParams(resolvedParams);
 
   if (!pathKey) {
     return NextResponse.json(
       {
         success: false,
-        error: {
-          code: "INVALID_PROXY_PATH",
-          message: "Missing API path",
-        },
+        error: { code: "INVALID_PROXY_PATH", message: "Missing API path" },
       },
       { status: 404 }
     );
   }
 
   const rawBody = shouldSendBody(method) ? await request.text() : "";
-
   const payload = parseJsonBody(rawBody);
-
   const productKey = getProductKey(request, payload);
 
   const headers = buildProxyHeaders(request, productKey);
-
   const upstreamUrl = `${API_ORIGIN}/api/${pathKey}${request.nextUrl.search}`;
 
   let upstream;
-
   try {
     upstream = await fetch(upstreamUrl, {
       method,
       headers,
       cache: "no-store",
-      credentials: "include",
       body: shouldSendBody(method) ? rawBody : undefined,
     });
   } catch {
@@ -361,9 +290,6 @@ const handleProxy = async (request, context) => {
 
   return createProxyResponse(request, upstream);
 };
-
-/*
- HTTP METHODS*/
 
 export async function GET(request, context) {
   return handleProxy(request, context);
