@@ -95,7 +95,7 @@ export function middleware(request) {
     return NextResponse.redirect(redirectUrl);
   }
  
-  if (!isAuthenticated || !isLoginRoute(pathname)) {
+  if (!hasValidAccessToken || !isLoginRoute(pathname)) {
     return NextResponse.next();
   }
  

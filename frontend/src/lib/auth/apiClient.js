@@ -84,9 +84,6 @@ const isPublicRoute = (url) =>
   PUBLIC_ROUTE_HINTS.some((hint) => String(url || "").includes(hint));
 
 const isRefreshRoute = (url) => String(url || "").includes(REFRESH_ENDPOINT);
-const isMutatingMethod = (method) =>
-  ["post", "put", "patch", "delete"].includes(String(method || "").toLowerCase());
-
 export const setAccessToken = (token) => {
   const nextValue = String(token || "").trim();
   accessToken = nextValue || null;
@@ -141,7 +138,12 @@ const refreshAccessTokenInternal = async () => {
 
   const productKey = getStableProductKey();
   const refreshProductKey = pickRefreshProductKey();
-  const csrfToken = readFirstCookie(["csrf_token_auto", "csrf_token", "csrf"]);
+  const csrfToken = readFirstCookie([
+    productKey ? `csrf_token_${productKey}` : "",
+    "csrf_token_auto",
+    "csrf_token",
+    "csrf",
+  ]);
   const headers = { "Content-Type": "application/json" };
 
   const primaryProductKey = productKey || refreshProductKey;
@@ -253,16 +255,20 @@ apiClient.interceptors.request.use(async (config) => {
   const url = String(config?.url || "");
   config.headers = config.headers || {};
 
-  if (isMutatingMethod(config?.method)) {
-    const csrfToken = readFirstCookie(["csrf_token"]);
-    if (csrfToken && !config.headers["x-csrf-token"]) {
-      config.headers["x-csrf-token"] = csrfToken;
-    }
+  const productKey = getStableProductKey();
+
+  const csrfToken = readFirstCookie([
+    productKey ? `csrf_token_${productKey}` : "",
+    "csrf_token_auto",
+    "csrf_token",
+    "csrf",
+  ]);
+  if (csrfToken && !config.headers["x-csrf-token"]) {
+    config.headers["x-csrf-token"] = csrfToken;
   }
 
   if (isPublicRoute(url) || isRefreshRoute(url)) return config;
 
-  const productKey = getStableProductKey();
   if (productKey) {
     config.headers["x-product-key"] = productKey;
   }
