@@ -43,6 +43,8 @@ const FORWARDED_HEADER_NAMES = [
   "authorization",
   "x-product-key",
   "x-csrf-token",
+  "origin",
+  "referer",
   "cookie",
 ];
 
@@ -117,6 +119,44 @@ const parseJsonBody = (rawBody) => {
 
 const shouldSendBody = (method) =>
   !["GET", "HEAD"].includes(String(method || "").toUpperCase());
+
+const decodeJwtPayload = (token) => {
+  const value = String(token || "").trim();
+  if (!value) return null;
+  const parts = value.split(".");
+  if (parts.length !== 3) return null;
+  const payload = parts[1];
+  if (!payload) return null;
+  const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+  const padLength = (4 - (base64.length % 4)) % 4;
+  const padded = `${base64}${"=".repeat(padLength)}`;
+  try {
+    const jsonText = Buffer.from(padded, "base64").toString("utf8");
+    const parsed = JSON.parse(jsonText);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+const pickRefreshProductKey = (request) => {
+  const refreshToken = String(
+    request.cookies.get("refresh_token_auto")?.value ||
+      request.cookies.get("refresh_token")?.value ||
+      ""
+  ).trim();
+  if (!refreshToken) return "";
+  const payload = decodeJwtPayload(refreshToken);
+  return String(
+    payload?.product_key ||
+      payload?.productKey ||
+      payload?.product_id ||
+      payload?.productId ||
+      ""
+  )
+    .trim()
+    .toLowerCase();
+};
 
 const getProductKey = (request, payload) => {
   return String(
@@ -267,14 +307,18 @@ const handleProxy = async (request, context) => {
   const headers = buildProxyHeaders(request, productKey);
   const upstreamUrl = `${API_ORIGIN}/api/${pathKey}${request.nextUrl.search}`;
 
+  const sendUpstream = async (nextHeaders, nextBody) => {
+    return fetch(upstreamUrl, {
+      method,
+      headers: nextHeaders,
+      cache: "no-store",
+      body: shouldSendBody(method) ? nextBody : undefined,
+    });
+  };
+
   let upstream;
   try {
-    upstream = await fetch(upstreamUrl, {
-      method,
-      headers,
-      cache: "no-store",
-      body: shouldSendBody(method) ? rawBody : undefined,
-    });
+    upstream = await sendUpstream(headers, rawBody);
   } catch {
     return NextResponse.json(
       {
@@ -286,6 +330,23 @@ const handleProxy = async (request, context) => {
       },
       { status: 502 }
     );
+  }
+
+  if (pathKey === "v1/auth/refresh" && upstream.status === 401) {
+    const refreshProductKey = pickRefreshProductKey(request);
+    if (refreshProductKey && refreshProductKey !== productKey) {
+      const retryPayload = { ...payload, product_key: refreshProductKey };
+      const retryHeaders = buildProxyHeaders(request, refreshProductKey);
+      try {
+        const retryUpstream = await sendUpstream(
+          retryHeaders,
+          JSON.stringify(retryPayload)
+        );
+        return createProxyResponse(request, retryUpstream);
+      } catch {
+        return createProxyResponse(request, upstream);
+      }
+    }
   }
 
   return createProxyResponse(request, upstream);
