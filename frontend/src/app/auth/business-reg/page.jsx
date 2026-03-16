@@ -338,6 +338,7 @@ function BusinessRegistrationPageContent() {
   const unlockedStepFromProgress = !isIdentityStepComplete
     ? 1
     : !isContactStepComplete
+    
     ? 2
     : !isLocationStepComplete
     ? 3
@@ -1227,15 +1228,28 @@ function BusinessRegistrationPageContent() {
                             business.business_name ||
                             business.name ||
                             "";
+                          const businessPlaceId =
+                            business.business_place_id || business.place_id || "";
 
                           return (
                             <div
-                              key={`${business.place_id || "biz"}-${idx}`}
+                              key={`${businessPlaceId || "biz"}-${idx}`}
                               className={BIZ_SUGGESTION_ITEM_CLASS}
                               onMouseDown={() => {
                                 setDisplayNameManuallyEdited(false);
                                 handleChange("business_name", businessLabel);
                                 setShowBusinessSuggestions(false);
+                                if (businessPlaceId) {
+                                  handleChange("place", {
+                                    label: businessLabel,
+                                    place_id: businessPlaceId,
+                                    photo_references: Array.isArray(
+                                      business.photo_references
+                                    )
+                                      ? business.photo_references
+                                      : [],
+                                  });
+                                }
                               }}
                             >
                               {businessLabel}
