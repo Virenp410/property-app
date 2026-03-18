@@ -13,6 +13,7 @@ import PrimaryButton from "@/components/PrimaryButton";
 import { sendOtp } from "@/services/otp.services";
 import { setJsonCookie } from "@/services/cookieStore";
 import { getActiveProductKey } from "@/lib/productKey";
+import { getOrCreateDeviceId } from "@/lib/deviceId";
 import {
   clearPopupReturnTarget,
   savePopupReturnTarget,
@@ -77,6 +78,7 @@ function LoginContent() {
 
     setLoading(true);
 
+    const deviceId = getOrCreateDeviceId();
     const otpContext = {
       type: "mobile",
       identifier_type: 0,
@@ -85,6 +87,7 @@ function LoginContent() {
       purpose: 0,
       via: method,
       product_key: getActiveProductKey(),
+      ...(deviceId ? { device_id: deviceId } : {}),
       ...(safeNextPath ? { redirect_to: safeNextPath } : {}),
     };
 

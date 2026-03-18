@@ -1,17 +1,9 @@
-import axios from "axios";
-import { clearAccessToken } from "./apiClient";
+import api, { clearAccessToken } from "./apiClient";
 import { getActiveProductKey } from "@/lib/productKey";
 
 export const logout = async () => {
   try {
-    await axios.post(
-      "/api/v1/logout",
-      { product_key: getActiveProductKey() },
-      {
-        withCredentials: true,
-        headers: { "Content-Type": "application/json" },
-      }
-    );
+    await api.post("/v1/logout", { product_key: getActiveProductKey() });
   } catch {
     // best effort
   } finally {

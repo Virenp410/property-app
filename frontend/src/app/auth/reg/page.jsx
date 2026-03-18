@@ -19,6 +19,7 @@ import { setAccessToken } from "@/lib/auth/apiClient";
 import { PRODUCT_KEY } from "@/lib/productKey";
 import { notifyParentAndClose } from "@/lib/auth/popupAuthBridge";
 import { readBridgeToken, resolveWebSsoRedirectUrl } from "@/services/sso.services";
+import { getDeviceId, getOrCreateDeviceId } from "@/lib/deviceId";
 import {
   getCookie,
   setCookie,
@@ -326,7 +327,12 @@ function RegistrationFormContent() {
     const bridgeTokenFromQuery = String(searchParams?.get("bridge_token") || "").trim();
     const bridgeTokenFromStore = String(getCookie("signup_bridge_token") || "").trim();
     const bridgeToken = bridgeTokenFromPayload || bridgeTokenFromQuery || bridgeTokenFromStore;
-    const target = await resolveWebSsoRedirectUrl({ webAppUrl, bridgeToken });
+    const deviceId = getDeviceId();
+    const target = await resolveWebSsoRedirectUrl({
+      webAppUrl,
+      bridgeToken,
+      deviceId,
+    });
     removeCookie("signup_bridge_token");
 
     let targetOrigin = "";
@@ -377,6 +383,7 @@ function RegistrationFormContent() {
         return;
       }
 
+      const deviceId = getOrCreateDeviceId();
       const otpContext = {
         type: "mobile",
         identifier_type: 0,
@@ -385,6 +392,7 @@ function RegistrationFormContent() {
         purpose: 0,
         via: "whatsapp",
         product_key: PRODUCT_KEY,
+        ...(deviceId ? { device_id: deviceId } : {}),
       };
 
       try {

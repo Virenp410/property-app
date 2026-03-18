@@ -33,6 +33,7 @@ import {
 } from "@/services/cookieStore";
 import { PRODUCT_KEY } from "@/lib/productKey";
 import { refreshAccessToken } from "@/lib/auth/apiClient";
+import { getOrCreateDeviceId } from "@/lib/deviceId";
 
 const EMPTY_FORM = {
   country_code: "91",
@@ -853,6 +854,7 @@ function BusinessRegistrationPageContent() {
       return;
     }
 
+    const deviceId = getOrCreateDeviceId();
     const otpContext = {
       type: "mobile",
       identifier_type: 0,
@@ -862,6 +864,7 @@ function BusinessRegistrationPageContent() {
       via: mobileOtpVia,
       product_key: PRODUCT_KEY,
       redirect_to: "/auth/business-reg",
+      ...(deviceId ? { device_id: deviceId } : {}),
     };
 
     try {
@@ -905,6 +908,7 @@ function BusinessRegistrationPageContent() {
       return;
     }
 
+    const deviceId = getOrCreateDeviceId();
     const otpContext = {
       type: "mobile",
       identifier_type: 0,
@@ -914,6 +918,7 @@ function BusinessRegistrationPageContent() {
       via: whatsappOtpVia,
       product_key: PRODUCT_KEY,
       redirect_to: "/auth/business-reg",
+      ...(deviceId ? { device_id: deviceId } : {}),
     };
 
     try {

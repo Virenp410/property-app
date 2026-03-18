@@ -1,6 +1,7 @@
 import axios from "axios";
 import { getActiveProductKey } from "@/lib/productKey";
 import { isSsoLockActive } from "./ssoLock";
+import { getDeviceId } from "@/lib/deviceId";
 
 const apiClient = axios.create({
   baseURL: "/api",
@@ -150,6 +151,7 @@ const refreshAccessTokenInternal = async () => {
   }
 
   const productKey = getStableProductKey();
+  const deviceId = getDeviceId();
   const refreshProductKey = pickRefreshProductKey();
   const csrfToken = readFirstCookie([
     productKey ? `csrf_token_${productKey}` : "",
@@ -180,6 +182,7 @@ const refreshAccessTokenInternal = async () => {
       headers: requestHeaders,
       body: JSON.stringify({
         ...(bodyProductKey ? { product_key: bodyProductKey } : {}),
+        ...(deviceId ? { device_id: deviceId } : {}),
       }),
       credentials: "include",
       keepalive: true,
@@ -267,6 +270,29 @@ const handleRefreshError = (err) => {
 apiClient.interceptors.request.use(async (config) => {
   const url = String(config?.url || "");
   config.headers = config.headers || {};
+  const deviceId = getDeviceId();
+  if (deviceId) {
+    const method = String(config?.method || "get").toLowerCase();
+    const isQueryMethod = ["get", "delete", "head"].includes(method);
+    if (isQueryMethod) {
+      if (typeof URLSearchParams !== "undefined" && config.params instanceof URLSearchParams) {
+        if (!config.params.get("device_id")) {
+          config.params.set("device_id", deviceId);
+        }
+      } else {
+        config.params = { ...(config.params || {}) };
+        if (!config.params.device_id) {
+          config.params.device_id = deviceId;
+        }
+      }
+    } else if (config.data && typeof config.data === "object" && !(config.data instanceof FormData)) {
+      if (!config.data.device_id) {
+        config.data = { ...config.data, device_id: deviceId };
+      }
+    } else if (!config.data) {
+      config.data = { device_id: deviceId };
+    }
+  }
 
   const productKey = getStableProductKey();
 

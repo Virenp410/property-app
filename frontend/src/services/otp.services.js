@@ -1,5 +1,6 @@
 import api from "@/lib/auth/apiClient";
 import { PRODUCT_KEY } from "@/lib/productKey";
+import { getDeviceId } from "@/lib/deviceId";
 import { getJsonCookie } from "./cookieStore";
 
 /*  MOBILE OTP  */
@@ -31,6 +32,7 @@ export const verifyOtp = ({ otp }) => {
   }
 
   const productKey = String(ctx?.product_key || PRODUCT_KEY).trim();
+  const deviceId = String(ctx?.device_id || getDeviceId() || "").trim();
 
   return api.post(
     "/v1/otp/verify-otp",
@@ -41,6 +43,7 @@ export const verifyOtp = ({ otp }) => {
       otp,
       purpose: ctx.purpose,
       product_key: productKey,
+      ...(deviceId ? { device_id: deviceId } : {}),
     },
     { withCredentials: false }
   );

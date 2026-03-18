@@ -14,6 +14,7 @@ import { getCurrentUserProfile } from "@/services/user.services";
 import { refreshAccessToken } from "@/lib/auth/apiClient";
 import { notifyParentAndClose } from "@/lib/auth/popupAuthBridge";
 import { readBridgeToken, resolveWebSsoRedirectUrl } from "@/services/sso.services";
+import { getDeviceId } from "@/lib/deviceId";
 
 const getSafeInternalRedirectPath = (value) => {
   const next = String(value || "").trim();
@@ -51,7 +52,12 @@ function VerifyOtpContent() {
 
   const redirectToWebHome = async (authPayload = null) => {
     const bridgeToken = readBridgeToken(authPayload);
-    const target = await resolveWebSsoRedirectUrl({ webAppUrl, bridgeToken });
+    const deviceId = getDeviceId();
+    const target = await resolveWebSsoRedirectUrl({
+      webAppUrl,
+      bridgeToken,
+      deviceId,
+    });
     let targetOrigin = "";
     try {
       targetOrigin = new URL(target).origin;
