@@ -19,24 +19,13 @@ const resolveApiOrigin = () => {
 };
 
 const API_ORIGIN = resolveApiOrigin();
-const isProd = process.env.NODE_ENV === "production";
 const normalizeCookieDomain = (value) => {
   const domain = String(value || "").trim();
   if (!domain) return "";
   if (domain === "localhost") return "";
   return domain;
 };
-const cookieDomain = isProd ? normalizeCookieDomain(process.env.COOKIE_DOMAIN) : "";
-const cookieOptions = {
-  httpOnly: true,
-  secure: isProd,
-  sameSite: isProd ? "none" : "lax",
-  path: "/",
-};
-
-if (cookieDomain) {
-  cookieOptions.domain = cookieDomain;
-}
+const cookieDomain = normalizeCookieDomain(process.env.COOKIE_DOMAIN);
 
 const FORWARDED_HEADER_NAMES = [
   "content-type",
@@ -50,6 +39,22 @@ const FORWARDED_HEADER_NAMES = [
 
 const isHttpsRequest = (request) =>
   String(request?.nextUrl?.protocol || "").toLowerCase() === "https:";
+
+const getCookieOptions = (request) => {
+  const isHttps = isHttpsRequest(request);
+  const options = {
+    httpOnly: true,
+    secure: isHttps,
+    sameSite: isHttps ? "none" : "lax",
+    path: "/",
+  };
+
+  if (cookieDomain) {
+    options.domain = cookieDomain;
+  }
+
+  return options;
+};
 
 const isTokenCookieName = (name) => {
   const key = String(name || "").trim();
@@ -66,7 +71,7 @@ const splitSetCookieAttributes = (cookie) =>
     .map((part) => String(part || "").trim())
     .filter(Boolean);
 
-const normalizeSetCookie = (cookie) => {
+const normalizeSetCookie = (cookie, request) => {
   const parts = splitSetCookieAttributes(cookie);
   if (!parts.length) return "";
 
@@ -74,6 +79,7 @@ const normalizeSetCookie = (cookie) => {
   const cookieName = String(nameValue.split("=")[0] || "").trim();
   if (!isTokenCookieName(cookieName)) return cookie;
 
+  const cookieOptions = getCookieOptions(request);
   const normalized = [];
 
   for (const attr of attributes) {
@@ -195,11 +201,11 @@ const buildProxyHeaders = (request, productKey) => {
   return headers;
 };
 
-const forwardSetCookieHeaders = (upstream, response) => {
+const forwardSetCookieHeaders = (upstream, response, request) => {
   if (typeof upstream.headers.getSetCookie === "function") {
     const cookies = upstream.headers.getSetCookie();
     for (const cookie of cookies) {
-      const normalized = normalizeSetCookie(cookie);
+      const normalized = normalizeSetCookie(cookie, request);
       if (normalized) response.headers.append("set-cookie", normalized);
     }
     return;
@@ -243,7 +249,7 @@ const forwardSetCookieHeaders = (upstream, response) => {
   if (tail) cookies.push(tail);
 
   for (const cookie of cookies) {
-    const normalized = normalizeSetCookie(cookie);
+    const normalized = normalizeSetCookie(cookie, request);
     if (normalized) response.headers.append("set-cookie", normalized);
   }
 };
@@ -255,7 +261,7 @@ const createProxyResponse = async (request, upstream) => {
   const contentType = upstream.headers.get("content-type");
   if (contentType) response.headers.set("content-type", contentType);
 
-  forwardSetCookieHeaders(upstream, response);
+  forwardSetCookieHeaders(upstream, response, request);
 
   const csrfFromHeader = String(
     upstream.headers.get("x-csrf-token") || upstream.headers.get("csrf-token") || ""
