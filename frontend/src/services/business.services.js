@@ -29,6 +29,14 @@ export const registerBusiness = async (data = {}) => {
   });
 };
 
+export const getOnboardingChargePreview = async (productKey) => {
+  const response = await api.get("/v1/payment/onboarding-charge-preview", {
+    headers: authHeaders(productKey),
+  });
+
+  return response.data;
+};
+
 export const verifyPanForBranch = async ({ pan, branch_id }) => {
   const panNumber = String(pan || "").trim().toUpperCase();
   const branchId = String(branch_id || "").trim();

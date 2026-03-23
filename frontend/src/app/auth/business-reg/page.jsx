@@ -18,6 +18,7 @@ import api from "@/lib/auth/apiClient";
 import { sendEmailOtp, sendOtp } from "@/services/otp.services";
 import {
   getBusinessAutocomplete,
+  getOnboardingChargePreview,
   registerBusiness,
   verifyPanForBranch as verifyPan,
   verifyGstForBranch as verifyGstin,
@@ -46,7 +47,7 @@ const EMPTY_FORM = {
   business_email: "",
   business_website: "",
   about_branch: "",
-  place: { label: "", place_id: null },
+  place: { label: "", place_id: null, photo_references: [] },
   pan_number: "",
   gstin: "",
   main_category_id: "",
@@ -78,8 +79,13 @@ const WIZARD_STEPS = [
   },
   {
     id: 4,
-    title: "Compliance & Submit",
-    subtitle: "Optional PAN/GST checks and final terms agreement.",
+    title: "Compliance Check",
+    subtitle: "Optional PAN/GST checks before the payment step.",
+  },
+  {
+    id: 5,
+    title: "Payment & Register",
+    subtitle: "Review onboarding charges, accept terms, and launch payment.",
   },
 ];
 
@@ -134,6 +140,16 @@ const BIZ_HELPER_SUCCESS_CLASS =
 const BUSINESS_SEANEB_VERIFIED_COOKIE = "business_seaneb_id_verified";
 const VERIFIED_BUSINESS_SEANEB_ID_COOKIE = "verified_business_seaneb_id";
 const SESSION_EXPIRED_REDIRECT_DELAY_MS = 20 * 60 * 1000;
+const normalizePhotoReferences = (value) =>
+  Array.isArray(value)
+    ? value.map((item) => String(item || "").trim()).filter(Boolean)
+    : [];
+const formatCurrency = (value) =>
+  new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0));
 
 export default function BusinessRegistrationPage() {
   return (
@@ -193,6 +209,9 @@ function BusinessRegistrationPageContent() {
   const [otpResetKey, setOtpResetKey] = useState(0);
   const [showOtpResendOptions, setShowOtpResendOptions] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
+  // Payment step state: preview onboarding charges before launching Cashfree checkout.
+  const [onboardingCharge, setOnboardingCharge] = useState(null);
+  const [onboardingChargeLoading, setOnboardingChargeLoading] = useState(false);
   const submitLockRef = useRef(false);
   const businessAutocompleteRef = useRef(null);
   const countryDropdownRef = useRef(null);
@@ -208,19 +227,65 @@ function BusinessRegistrationPageContent() {
     }
   }, []);
 
-  const handoffToDealerDash = useCallback(() => {
-    const authOrigin =
-      typeof window !== "undefined"
-        ? window.location.origin
-        : String(process.env.NEXT_PUBLIC_AUTH_APP_URL || "").replace(/\/$/, "");
-    const dealerDashboardUrl = `${authOrigin}/auth/dealerdash`;
+  const redirectToDealerDashboard = useCallback(() => {
+    router.replace("/auth/dealerdash");
+  }, [router]);
 
-    if (typeof window !== "undefined") {
-      window.location.href = dealerDashboardUrl;
+  const redirectAfterRegistration = useCallback(() => {
+    if (typeof window === "undefined") {
+      redirectToDealerDashboard();
       return;
     }
-    router.replace(dealerDashboardUrl);
-  }, [router]);
+
+    const configuredListingUrl = String(process.env.NEXT_PUBLIC_LISTING_URL || "").trim();
+    if (configuredListingUrl) {
+      window.location.href = configuredListingUrl;
+      return;
+    }
+
+    redirectToDealerDashboard();
+  }, [redirectToDealerDashboard]);
+
+  // Starts the Cashfree modal checkout using the payment session returned by registration.
+  const startPayment = useCallback((sessionId) => {
+    try {
+      const cashfreeFactory = window?.Cashfree;
+      if (typeof cashfreeFactory !== "function") {
+        throw new Error("Cashfree SDK is not loaded.");
+      }
+
+      const cashfree = cashfreeFactory({
+        mode: String(process.env.NEXT_PUBLIC_CASHFREE_MODE || "sandbox"),
+      });
+
+      cashfree.checkout({
+        paymentSessionId: sessionId,
+        redirectTarget: "_modal",
+      });
+    } catch (err) {
+      console.error("Payment error:", err);
+      setErrorMessage("Payment start failed. Please try again.");
+    }
+  }, []);
+
+  // Loads the backend-provided onboarding amount shown on the final payment step.
+  const loadOnboardingCharge = useCallback(async () => {
+    setOnboardingChargeLoading(true);
+    try {
+      const response = await retryWithSessionRefresh(() => getOnboardingChargePreview(PRODUCT_KEY));
+      setOnboardingCharge(response?.data || null);
+      setErrorMessage("");
+    } catch (err) {
+      if (isUnauthorizedError(err)) {
+        setSessionExpired(true);
+        setErrorMessage("Session expired. Please login again.");
+      } else {
+        setErrorMessage(getErrorMessage(err, "Unable to load onboarding charges."));
+      }
+    } finally {
+      setOnboardingChargeLoading(false);
+    }
+  }, [retryWithSessionRefresh]);
 
   useEffect(() => {
     const hasReturnTo = Boolean(searchParams?.get("return_to"));
@@ -295,6 +360,17 @@ function BusinessRegistrationPageContent() {
 
   const isComplianceStepComplete =
     isPanFormatValid && isGstinFormatValid;
+  const isPaymentStepReady =
+    Boolean(onboardingCharge?.description) &&
+    Number.isFinite(Number(onboardingCharge?.base_amount)) &&
+    Number.isFinite(Number(onboardingCharge?.gst_percentage)) &&
+    form.agree;
+  const onboardingBaseAmount = Number(onboardingCharge?.base_amount || 0);
+  const onboardingGstPercentage = Number(onboardingCharge?.gst_percentage || 0);
+  const onboardingGstAmount = Math.round(
+    onboardingBaseAmount * (onboardingGstPercentage / 100)
+  );
+  const onboardingTotalAmount = onboardingBaseAmount + onboardingGstAmount;
 
   const {
     verify: verifyInlineOtp,
@@ -332,6 +408,7 @@ function BusinessRegistrationPageContent() {
     2: Boolean(isContactStepComplete),
     3: Boolean(isLocationStepComplete),
     4: Boolean(isComplianceStepComplete),
+    5: Boolean(isPaymentStepReady),
   };
 
   const currentStepMeta = WIZARD_STEPS.find((step) => step.id === currentStep) || WIZARD_STEPS[0];
@@ -339,11 +416,12 @@ function BusinessRegistrationPageContent() {
   const unlockedStepFromProgress = !isIdentityStepComplete
     ? 1
     : !isContactStepComplete
-    
     ? 2
     : !isLocationStepComplete
     ? 3
-    : 4;
+    : !isComplianceStepComplete
+    ? 4
+    : 5;
 
   const maxReachableStep = Math.max(currentStep, unlockedStepFromProgress);
 
@@ -359,6 +437,9 @@ function BusinessRegistrationPageContent() {
     }
     if (stepId === 4 && !isComplianceStepComplete) {
       return "Check PAN/GST formats before submitting.";
+    }
+    if (stepId === 5 && !form.agree) {
+      return "Accept the business terms and conditions before registering.";
     }
     return "";
   };
@@ -388,6 +469,13 @@ function BusinessRegistrationPageContent() {
     setErrorMessage("");
     setCurrentStep((prev) => Math.min(WIZARD_STEPS.length, prev + 1));
   };
+
+  useEffect(() => {
+    if (currentStep !== 5) return;
+    if (onboardingCharge || onboardingChargeLoading) return;
+    // Preload charges as soon as the user reaches the payment step.
+    loadOnboardingCharge();
+  }, [currentStep, onboardingCharge, onboardingChargeLoading, loadOnboardingCharge]);
 
   const handleChange = (key, value) => {
     if (key === "business_email") {
@@ -634,7 +722,7 @@ function BusinessRegistrationPageContent() {
     if (typeof value === "string") {
       setForm((prev) => ({
         ...prev,
-        place: { label: value, place_id: null },
+        place: { label: value, place_id: null, photo_references: [] },
       }));
       return;
     }
@@ -676,7 +764,7 @@ function BusinessRegistrationPageContent() {
 
         if (profileRegistered) {
           setCookie("dashboard_mode", "dealer", { days: 365 });
-          handoffToDealerDash();
+          redirectToDealerDashboard();
         }
       } catch (err) {
         if (isUnauthorizedError(err)) {
@@ -691,7 +779,7 @@ function BusinessRegistrationPageContent() {
     return () => {
       active = false;
     };
-  }, [handoffToDealerDash, retryWithSessionRefresh, router]);
+  }, [redirectToDealerDashboard, retryWithSessionRefresh, router]);
 
   useEffect(() => {
     if (sessionExpired) {
@@ -1040,7 +1128,7 @@ function BusinessRegistrationPageContent() {
   };
 
   const handleSubmit = async () => {
-    if (!isFormComplete || loading || submitLockRef.current) return;
+    if (!isFormComplete || !onboardingCharge || loading || submitLockRef.current) return;
     submitLockRef.current = true;
 
     setLoading(true);
@@ -1052,6 +1140,8 @@ function BusinessRegistrationPageContent() {
     const normalizedDisplayName = normalizeBusinessLabel(
       form.display_name || form.business_name
     );
+    const photoReferences = normalizePhotoReferences(form.place?.photo_references);
+    const primaryPhotoReference = photoReferences[0] || "";
 
     const payload = {
       business_name: normalizedBusinessName,
@@ -1067,6 +1157,11 @@ function BusinessRegistrationPageContent() {
       place_id: form.place.place_id,
       main_category_id: form.main_category_id,
     };
+
+    if (photoReferences.length > 0) {
+      payload.photo_references = photoReferences;
+      payload.photo_reference = primaryPhotoReference;
+    }
 
     if (hasBusinessEmail) {
       payload.business_email = form.business_email.trim();
@@ -1086,19 +1181,36 @@ function BusinessRegistrationPageContent() {
     }
 
     try {
+      // Registers the business first; the backend may attach a Cashfree payment session.
       const response = await retryWithSessionRefresh(() => registerBusiness(payload));
       const data = response?.data || {};
       const branch = String(data?.branch_id || data?.default_branch_id || "");
       if (branch) setBranchId(branch);
 
-      setSuccessMessage(t.businessRegisterSuccess);
       removeCookie("business_reg_draft");
       removeCookie(BUSINESS_SEANEB_VERIFIED_COOKIE);
       removeCookie(VERIFIED_BUSINESS_SEANEB_ID_COOKIE);
       setCookie("dashboard_mode", "dealer", { days: 365 });
       setCookie("profile_completed", "true", { days: 365 });
+      const paymentSessionId = String(
+        data?.payment_session_id || data?.data?.payment_session_id || ""
+      ).trim();
 
-      handoffToDealerDash();
+      if (paymentSessionId) {
+        // If payment is required, launch Cashfree checkout and then continue the onboarding redirect.
+        setSuccessMessage("Redirecting to payment...");
+        startPayment(paymentSessionId);
+
+        window.setTimeout(() => {
+          redirectAfterRegistration();
+        }, 5000);
+        return;
+      }
+
+      setSuccessMessage(t.businessRegisterSuccess);
+      window.setTimeout(() => {
+        redirectAfterRegistration();
+      }, 1500);
     } catch (err) {
       if (isUnauthorizedError(err)) {
         setSessionExpired(true);
@@ -1147,7 +1259,7 @@ function BusinessRegistrationPageContent() {
               <p className="mb-0 mt-1 text-[13px] text-[#4a678d]">{currentStepMeta.subtitle}</p>
             </div>
           </div>
-          <div className="grid grid-cols-4 gap-2 [@media(max-width:900px)]:grid-cols-2">
+          <div className="grid grid-cols-5 gap-2 [@media(max-width:900px)]:grid-cols-2">
             {WIZARD_STEPS.map((step) => (
               <WizardStepBadge
                 key={step.id}
@@ -1735,8 +1847,58 @@ function BusinessRegistrationPageContent() {
           </section>
           )}
 
-          {currentStep === 4 && (
+          {currentStep === 5 && (
           <div className="rounded-[18px] border border-[#d5e1f0] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)] p-[16px] shadow-[0_14px_28px_rgba(15,42,85,0.08)]">
+            <div className="rounded-[16px] border border-[#d6e1f0] bg-white px-4 py-4 shadow-[0_10px_20px_rgba(15,42,85,0.06)]">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-[#35619a]">
+                    Onboarding charges
+                  </p>
+                  <h4 className="mt-1 text-[18px] font-semibold text-[#12335f]">
+                    {onboardingCharge?.description || "Loading charge details..."}
+                  </h4>
+                </div>
+                <button
+                  type="button"
+                  className="inline-flex h-10 items-center justify-center rounded-[10px] border border-[#b7cae4] bg-white px-4 text-[13px] font-semibold text-[#184a89] transition-colors duration-200 hover:bg-[#edf4ff] disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={loadOnboardingCharge}
+                  disabled={onboardingChargeLoading || loading}
+                >
+                  {onboardingChargeLoading ? "Refreshing..." : "Refresh amount"}
+                </button>
+              </div>
+
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                <div className="rounded-[14px] border border-[#d8e4f2] bg-[#f8fbff] px-4 py-3">
+                  <p className="text-[12px] text-[#6480a4]">Base Amount</p>
+                  <p className="mt-1 text-[22px] font-bold text-[#12335f]">
+                    {formatCurrency(onboardingBaseAmount)}
+                  </p>
+                </div>
+                <div className="rounded-[14px] border border-[#d8e4f2] bg-[#f8fbff] px-4 py-3">
+                  <p className="text-[12px] text-[#6480a4]">GST</p>
+                  <p className="mt-1 text-[22px] font-bold text-[#12335f]">
+                    {onboardingGstPercentage}%
+                  </p>
+                </div>
+                <div className="rounded-[14px] border border-[#c8daf3] bg-[linear-gradient(135deg,#eef5ff_0%,#e5efff_100%)] px-4 py-3">
+                  <p className="text-[12px] text-[#50719b]">Total Payable</p>
+                  <p className="mt-1 text-[22px] font-bold text-[#0d3878]">
+                    {formatCurrency(onboardingTotalAmount)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-[14px] border border-[#deebf7] bg-[#f7fbff] px-4 py-3 text-[13px] text-[#4a678d]">
+                {onboardingChargeLoading
+                  ? "Fetching onboarding amount..."
+                  : onboardingCharge
+                  ? `Includes GST amount of ${formatCurrency(onboardingGstAmount)}.`
+                  : "Unable to load onboarding charges right now."}
+              </div>
+            </div>
+
             <label className="mb-3 flex items-center gap-[10px] text-[14px] text-[var(--color-text-body-strong)]">
               <input
                 type="checkbox"
@@ -1760,9 +1922,9 @@ function BusinessRegistrationPageContent() {
               className="mt-[18px] min-h-12 rounded-[12px] text-[15px] font-bold tracking-[0.01em]"
               activeClassName="cursor-pointer bg-[linear-gradient(135deg,#0f4ec9_0%,#0b3ea2_100%)] text-[var(--color-white)] shadow-[0_12px_24px_rgba(15,78,201,0.32)] hover:translate-y-[-1px] hover:shadow-[0_14px_30px_rgba(15,78,201,0.40)]"
               disabledClassName="cursor-not-allowed bg-[var(--color-btn-disabled-bg)] text-[var(--color-btn-disabled-text)]"
-              disabled={!isFormComplete || loading}
+              disabled={!isFormComplete || !onboardingCharge || onboardingChargeLoading || loading}
             >
-              {loading ? t.submitting : t.registerBusiness}
+              {loading ? "Starting payment..." : "Pay now and register"}
             </PrimaryButton>
           </div>
           )}
