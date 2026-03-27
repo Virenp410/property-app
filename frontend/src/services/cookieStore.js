@@ -3,10 +3,8 @@
 import { readBrowserCookie } from "@/lib/auth/shared";
 
 const TOKEN_COOKIE_NAMES = new Set([
-  "csrf_token",
-  "csrf_token_auto",
-  "refresh_token",
-  "refresh_token_auto",
+  `csrf_token_${process.env.NEXT_PUBLIC_PRODUCT_KEY}`,
+  `refresh_token_${process.env.NEXT_PUBLIC_PRODUCT_KEY}`,
 ]);
 
 const transientState = new Map();

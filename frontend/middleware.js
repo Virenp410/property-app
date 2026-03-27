@@ -35,8 +35,8 @@ const isJwtNotExpired = (token) => {
 };
  
 const resolveProductKey = () => {
-  const key = String(process.env.NEXT_PUBLIC_PRODUCT_KEY || "auto").trim();
-  return key || "auto";
+  const key = String(process.env.NEXT_PUBLIC_PRODUCT_KEY).trim();
+  return key ;
 };
 const resolveWebAppUrl = () =>
   String(process.env.NEXT_PUBLIC_WEB_APP_URL || process.env.NEXT_PUBLIC_APP_URL)
@@ -71,17 +71,11 @@ export function middleware(request) {
  
   const productKey = resolveProductKey();
   const accessToken =
-    request.cookies.get(`access_token_${productKey}`)?.value ||
-    request.cookies.get("access_token_auto")?.value ||
-    request.cookies.get("access_token")?.value;
+    request.cookies.get(`access_token_${productKey}`)?.value
   const refreshToken =
-    request.cookies.get(`refresh_token_${productKey}`)?.value ||
-    request.cookies.get("refresh_token_auto")?.value ||
-    request.cookies.get("refresh_token")?.value;
+    request.cookies.get(`refresh_token_${productKey}`)?.value 
   const csrfToken =
-    request.cookies.get(`csrf_token_${productKey}`)?.value ||
-    request.cookies.get("csrf_token_auto")?.value ||
-    request.cookies.get("csrf_token")?.value;
+    request.cookies.get(`csrf_token_${productKey}`)?.value 
  
   const hasValidAccessToken = isJwtNotExpired(accessToken);
   const isAuthenticated = Boolean(hasValidAccessToken || refreshToken || csrfToken);

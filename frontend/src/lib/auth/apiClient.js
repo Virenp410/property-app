@@ -131,7 +131,7 @@ const decodeJwtPayload = (token) => {
 };
 
 const pickRefreshProductKey = () => {
-  const refreshToken = readFirstCookie(["refresh_token_auto", "refresh_token"]);
+  const refreshToken = readFirstCookie([`refresh_token_${process.env.NEXT_PUBLIC_PRODUCT_KEY}`]);
   if (!refreshToken) return "";
   const payload = decodeJwtPayload(refreshToken);
   const productId = String(payload?.product_id || payload?.productId || "").trim();
@@ -154,10 +154,7 @@ const refreshAccessTokenInternal = async () => {
   const deviceId = getDeviceId();
   const refreshProductKey = pickRefreshProductKey();
   const csrfToken = readFirstCookie([
-    productKey ? `csrf_token_${productKey}` : "",
-    "csrf_token_auto",
-    "csrf_token",
-    "csrf",
+    productKey ? `csrf_token_${productKey}` : ""
   ]);
   const headers = { "Content-Type": "application/json" };
 
@@ -297,10 +294,7 @@ apiClient.interceptors.request.use(async (config) => {
   const productKey = getStableProductKey();
 
   const csrfToken = readFirstCookie([
-    productKey ? `csrf_token_${productKey}` : "",
-    "csrf_token_auto",
-    "csrf_token",
-    "csrf",
+    productKey ? `csrf_token_${productKey}` : ""
   ]);
   if (csrfToken && !config.headers["x-csrf-token"]) {
     config.headers["x-csrf-token"] = csrfToken;

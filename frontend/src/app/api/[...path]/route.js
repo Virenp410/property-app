@@ -59,9 +59,7 @@ const getCookieOptions = (request) => {
 const isTokenCookieName = (name) => {
   const key = String(name || "").trim();
   if (!key) return false;
-  if (key === "refresh_token_auto" || key === "csrf_token_auto") return true;
-  if (key === "refresh_token" || key === "csrf_token") return true;
-  if (key.startsWith("refresh_token_") || key.startsWith("csrf_token_")) return true;
+  if (key === `refresh_token_${process.env.NEXT_PUBLIC_PRODUCT_KEY}` || key === `csrf_token_${process.env.NEXT_PUBLIC_PRODUCT_KEY}`) return true;
   return false;
 };
 
@@ -147,9 +145,7 @@ const decodeJwtPayload = (token) => {
 
 const pickRefreshProductKey = (request) => {
   const refreshToken = String(
-    request.cookies.get("refresh_token_auto")?.value ||
-      request.cookies.get("refresh_token")?.value ||
-      ""
+    request.cookies.get(`refresh_token_${process.env.NEXT_PUBLIC_PRODUCT_KEY}`)?.value 
   ).trim();
   if (!refreshToken) return "";
   const payload = decodeJwtPayload(refreshToken);
@@ -191,7 +187,7 @@ const buildProxyHeaders = (request, productKey) => {
   if (!headers.get("x-csrf-token")) {
     const csrfToken = String(
       (productKey ? request.cookies.get(`csrf_token_${productKey}`)?.value : "") ||
-        request.cookies.get("csrf_token_auto")?.value ||
+        request.cookies.get(`csrf_token_${productKey}`)?.value ||
         request.cookies.get("csrf_token")?.value ||
         ""
     ).trim();

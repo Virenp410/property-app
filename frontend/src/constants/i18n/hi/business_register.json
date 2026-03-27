@@ -69,5 +69,8 @@
   "seanebIdVerifiedMessage": "SeaNeB ID सत्यापित हो गई है।",
   "seanebIdExistsMessage": "SeaNeB ID पहले से मौजूद है।",
   "seanebIdInvalidMessage": "SeaNeB ID का फॉर्मेट अमान्य है।",
-  "seanebIdVerifyFailedMessage": "SeaNeB ID सत्यापन विफल रहा।"
+  "seanebIdVerifyFailedMessage": "SeaNeB ID सत्यापन विफल रहा।",
+  "back":"वापस जाओ",
+  "WIZARD_STEPS_1title":"व्यवसाय की पहचान",
+  "WIZARD_STEPS_1subtitle":"व्यवसाय का नाम, श्रेणी और SeaNeB शाखा आईडी का सत्यापन"
 }

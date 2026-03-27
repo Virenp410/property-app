@@ -209,7 +209,8 @@ function BusinessRegistrationPageContent() {
   const [otpResetKey, setOtpResetKey] = useState(0);
   const [showOtpResendOptions, setShowOtpResendOptions] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
-  // Payment step state: preview onboarding charges before launching Cashfree checkout.
+
+
   const [onboardingCharge, setOnboardingCharge] = useState(null);
   const [onboardingChargeLoading, setOnboardingChargeLoading] = useState(false);
   const submitLockRef = useRef(false);

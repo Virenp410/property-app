@@ -57,6 +57,7 @@
   "gstinVerifyFailed": "GSTIN verification failed.",
   "registerBusiness": "Register Business",
   "submitting": "Submitting...",
+  "continue":"continue",
   "businessRegisterSuccess": "Business registered successfully.",
   "businessRegisterError": "Unable to register business. Please check details.",
   "otpResendTooFast": "You are requesting OTP too frequently. Please wait.",
@@ -71,5 +72,7 @@
   "seanebIdVerifiedMessage": "SeaNeB ID verified.",
   "seanebIdExistsMessage": "SeaNeB ID already exists.",
   "seanebIdInvalidMessage": "Invalid SeaNeB ID format.",
-  "seanebIdVerifyFailedMessage": "Unable to verify SeaNeB ID."
+  "seanebIdVerifyFailedMessage": "Unable to verify SeaNeB ID.",
+  "WIZARD_STEPS_1title":"Business Identity",
+  "WIZARD_STEPS_1subtitle":"Business name, category and SeaNeB branch ID verification"
 }

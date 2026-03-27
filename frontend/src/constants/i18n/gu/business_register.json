@@ -11,6 +11,8 @@
   "businessNamePlaceholder": "દા.ત. SeaNeB Technology Pvt Ltd",
   "displayName": "ડિસ્પ્લે નામ *",
   "displayNamePlaceholder": "દા.ત. SeaNeB Tech",
+  "back":"પાછા જાઓ",
+  "continue":"આગળ વધો",
   "seanebBranchId": "SeaNeB બ્રાન્ચ ID *",
   "seanebBranchPlaceholder": "seaneb-branch01",
   "businessEmail": "બિઝનેસ ઇમેઇલ *",
@@ -69,5 +71,7 @@
   "seanebIdVerifiedMessage": "SeaNeB ID ચકાસાઈ ગઈ છે.",
   "seanebIdExistsMessage": "SeaNeB ID પહેલેથી જ ઉપલબ્ધ છે.",
   "seanebIdInvalidMessage": "SeaNeB ID નું ફોર્મેટ અમાન્ય છે.",
-  "seanebIdVerifyFailedMessage": "SeaNeB ID ચકાસણી નિષ્ફળ રહી."
+  "seanebIdVerifyFailedMessage": "SeaNeB ID ચકાસણી નિષ્ફળ રહી.",
+  "WIZARD_STEPS_1title":"વ્યવસાયની ઓળખ",
+  "WIZARD_STEPS_1subtitle":"વ્યવસાયનું નામ, શ્રેણી અને SeaNeB શાખા ID ચકાસણી"
 }
