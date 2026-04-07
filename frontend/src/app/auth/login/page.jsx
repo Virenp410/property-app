@@ -116,88 +116,120 @@ function LoginContent() {
 
   return (
     <AuthLayout lang={lang} onLangChange={setLang}>
-      <h2 className="text-[24px] font-semibold text-black">{t.login}</h2>
-      <p className="mt-1.5 text-[14px] text-(--auth-subtle)">{t.subtitle}</p>
-
-      <label className="mb-1.5 mt-5.5 block text-[14px] text-(--auth-label)">
-        {t.mobileLabel}
-      </label>
-
-      <div className="relative flex items-center rounded-[10px] border border-(--auth-border) bg-white p-2.5 focus-within:border-(--auth-border-strong) focus-within:[box-shadow:0_0_0_1px_var(--auth-border-strong)]">
-        <div
-          className="flex cursor-pointer items-center gap-1.5 border-r border-r-(--auth-border) pr-4.5"
-          onClick={() => setShowCountries(!showCountries)}
-        >
-          <img
-            src={country.flag}
-            alt={country.name}
-            className="h-3.5 w-5 object-cover"
-          />
-          <span>{country.dialCode}</span>
-          <span className="text-[12px] text-[#555555]">{"\u25BE"}</span>
-        </div>
-
-        <input
-          type="tel"
-          className="w-full border-0 pl-2.5 text-[14px] outline-none"
-          placeholder={t.placeholder}
-          maxLength={10}
-          value={mobile}
-          onChange={(e) =>
-            setMobile(e.target.value.replace(/\D/g, ""))
-          }
-        />
-
-        {showCountries && (
-          <div className="absolute left-0 top-14.5 z-50 max-h-65 w-full overflow-y-auto rounded-xl border border-[#dddddd] bg-white shadow-[0_10px_30px_rgba(0,0,0,0.12)]">
-            {countries.map((c) => (
-              <div
-                key={c.name}
-                className="flex cursor-pointer items-center gap-2.5 border border-(--color-border-brand-soft) bg-white px-3 py-2.5 text-(--color-brand-primary) hover:bg-(--color-surface-muted)"
-                onClick={() => {
-                  setCountry(c);
-                  setShowCountries(false);
-                }}
-              >
-                <img
-                  src={c.flag}
-                  alt={c.name}
-                  className="h-4 w-5.5 object-cover"
-                />
-                <span className="flex-1 text-[14px]">{c.name}</span>
-                <span className="text-[13px] text-[#555555]">{c.dialCode}</span>
-              </div>
-            ))}
-          </div>
-        )}
+      <div className="mb-1">
+        <h2 className="text-[22px] font-bold text-[var(--color-text-heading)] tracking-tight">{t.login}</h2>
+        <p className="mt-1 text-[13.5px] text-[var(--auth-subtle)]">{t.subtitle}</p>
       </div>
 
-      <div className="mt-4.5 flex gap-5">
-        <label className="flex cursor-pointer items-center gap-1.5 text-[14px] text-(--auth-label)">
-          <input
-            type="radio"
-            checked={method === "sms"}
-            onChange={() => setMethod("sms")}
-          />
-          {t.viaSms}
+      <div className="mt-5">
+        <label className="mb-1.5 block text-[12.5px] font-semibold uppercase tracking-wide text-[var(--auth-field-label)]">
+          {t.mobileLabel}
         </label>
 
-        <label className="flex cursor-pointer items-center gap-1.5 text-[14px] text-(--auth-label)">
+        <div className="relative flex items-center rounded-[10px] border border-[var(--auth-border)] bg-white transition-all duration-200 focus-within:border-[var(--color-brand-primary)] focus-within:[box-shadow:0_0_0_3px_rgba(201,162,77,0.18)]">
+          <div
+            className="flex cursor-pointer items-center gap-1.5 px-3 py-3 border-r border-r-[var(--auth-border)]"
+            onClick={() => setShowCountries(!showCountries)}
+          >
+            <img
+              src={country.flag}
+              alt={country.name}
+              className="h-3.5 w-5 object-cover rounded-[2px]"
+            />
+            <span className="text-[13.5px] text-[var(--color-text-body-strong)] font-medium">{country.dialCode}</span>
+            <span className="text-[11px] text-[#888888]">{"▾"}</span>
+          </div>
+
           <input
-            type="radio"
-            checked={method === "whatsapp"}
-            onChange={() => setMethod("whatsapp")}
+            type="tel"
+            id="mobile-input"
+            className="w-full border-0 px-3 py-3 text-[14px] text-[var(--color-text-primary)] placeholder:text-[var(--auth-placeholder)] outline-none bg-transparent"
+            placeholder={t.placeholder}
+            maxLength={10}
+            value={mobile}
+            onChange={(e) =>
+              setMobile(e.target.value.replace(/\D/g, ""))
+            }
           />
-          {t.viaWhatsapp}
-        </label>
+
+          {showCountries && (
+            <div className="absolute left-0 top-[calc(100%+6px)] z-50 max-h-60 w-full overflow-y-auto rounded-[12px] border border-[var(--color-border-brand-soft)] bg-white shadow-[0_12px_36px_rgba(0,0,0,0.14)]">
+              {countries.map((c) => (
+                <div
+                  key={c.name}
+                  className="flex cursor-pointer items-center gap-2.5 px-3.5 py-2.5 text-[var(--color-text-primary)] hover:bg-[var(--color-surface-muted)] transition-colors duration-150"
+                  onClick={() => {
+                    setCountry(c);
+                    setShowCountries(false);
+                  }}
+                >
+                  <img
+                    src={c.flag}
+                    alt={c.name}
+                    className="h-4 w-5.5 object-cover rounded-[2px]"
+                  />
+                  <span className="flex-1 text-[13.5px]">{c.name}</span>
+                  <span className="text-[12.5px] text-[var(--auth-subtle)]">{c.dialCode}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* OTP method selector */}
+      <div className="mt-4 flex gap-3">
+        {[
+          { value: "sms", label: t.viaSms },
+          { value: "whatsapp", label: t.viaWhatsapp },
+        ].map(({ value, label }) => {
+          const isActive = method === value;
+          return (
+            <label
+              key={value}
+              className={`flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-[9px] border py-2.5 text-[13.5px] font-medium transition-all duration-200 ${
+                isActive
+                  ? "border-[var(--color-brand-primary)] bg-[var(--color-page-bg-soft)] text-[var(--color-brand-primary)]"
+                  : "border-[var(--auth-border)] bg-white text-[var(--auth-label)] hover:border-[var(--color-border-brand-soft)] hover:bg-[var(--color-surface-muted)]"
+              }`}
+            >
+              <input
+                type="radio"
+                checked={isActive}
+                onChange={() => setMethod(value)}
+                className="hidden"
+              />
+              <span
+                className={`h-3.5 w-3.5 rounded-full border-[1.5px] transition-all duration-200 ${
+                  isActive
+                    ? "border-[var(--color-brand-primary)] bg-[var(--color-brand-primary)] [box-shadow:inset_0_0_0_2px_white]"
+                    : "border-[#cccccc] bg-white"
+                }`}
+              />
+              {label}
+            </label>
+          );
+        })}
       </div>
 
       <PrimaryButton
         disabled={!isValidMobile || loading}
         onClick={sendOtpApi}
       >
-        {loading ? "Sending..." : t.continue}
+        {loading ? "Sending…" : t.continue}
       </PrimaryButton>
+
+      <p className="mt-4 text-center text-[12px] text-[var(--auth-muted)]">
+        By continuing, you agree to our{" "}
+        <a href="#" className="text-[var(--color-link-primary)] underline underline-offset-2 hover:text-[var(--color-brand-primary)]">
+          Terms &amp; Conditions
+        </a>{" "}
+        and{" "}
+        <a href="#" className="text-[var(--color-link-primary)] underline underline-offset-2 hover:text-[var(--color-brand-primary)]">
+          Privacy Policy
+        </a>
+        .
+      </p>
     </AuthLayout>
   );
 }

@@ -55,10 +55,10 @@ const EMPTY_FORM = {
 };
 
 const AUTO_BUSINESS_TYPE_OPTIONS = [
-  { value: "0", label: "Individual Car Dealer" },
-  { value: "1", label: "Dealership Showroom" },
-  { value: "2", label: "Used Car Broker" },
-  { value: "3", label: "Multi-Brand Auto Hub" },
+  { value: "0", label: "Individual Agent" },
+  { value: "1", label: "Real Estate Agency" },
+  { value: "2", label: "Developer" },
+  { value: "3", label: "Broker Firm" },
 ];
 
 const WIZARD_STEPS = [
@@ -117,21 +117,21 @@ const getCountryByCode = (code) => {
 };
 
 const BIZ_INPUT_CLASS =
-  "h-[48px] w-full rounded-[12px] border border-[#c6d6ea] bg-[var(--color-white)] px-[14px] text-[14px] text-[var(--color-text-primary)] placeholder:text-[#91a6c4] transition-[border-color,box-shadow,transform] duration-200 ease-in-out focus:border-[#0f4ec9] focus:outline-none focus:[box-shadow:0_0_0_4px_rgba(15,78,201,0.16)]";
+  "h-[48px] w-full rounded-[12px] border border-[#E6D6B1] bg-[var(--color-white)] px-[14px] text-[14px] text-[var(--color-text-primary)] placeholder:text-[#BFAF8A] transition-[border-color,box-shadow,transform] duration-200 ease-in-out focus:border-[#C9A24D] focus:outline-none focus:[box-shadow:0_0_0_4px_rgba(201,162,77,0.20)]";
 const BIZ_TEXTAREA_CLASS =
-  "h-auto min-h-[116px] w-full resize-y rounded-[12px] border border-[#c6d6ea] bg-[var(--color-white)] px-[14px] py-[11px] text-[14px] leading-[1.5] text-[var(--color-text-primary)] placeholder:text-[#91a6c4] transition-[border-color,box-shadow,transform] duration-200 ease-in-out focus:border-[#0f4ec9] focus:outline-none focus:[box-shadow:0_0_0_4px_rgba(15,78,201,0.16)]";
+  "h-auto min-h-[116px] w-full resize-y rounded-[12px] border border-[#E6D6B1] bg-[var(--color-white)] px-[14px] py-[11px] text-[14px] leading-[1.5] text-[var(--color-text-primary)] placeholder:text-[#BFAF8A] transition-[border-color,box-shadow,transform] duration-200 ease-in-out focus:border-[#C9A24D] focus:outline-none focus:[box-shadow:0_0_0_4px_rgba(201,162,77,0.20)]";
 const BIZ_AUTOCOMPLETE_WRAPPER_CLASS = "relative";
 const BIZ_SUGGESTION_BOX_CLASS =
-  "absolute left-0 top-full z-[60] max-h-[220px] w-full overflow-y-auto rounded-b-[12px] border border-t-0 border-[#c6d6ea] bg-[var(--color-white)] shadow-[0_16px_30px_rgba(15,42,85,0.18)]";
+  "absolute left-0 top-full z-[60] max-h-[220px] w-full overflow-y-auto rounded-b-[12px] border border-t-0 border-[#E6D6B1] bg-[var(--color-white)] shadow-[0_16px_30px_rgba(79,60,24,0.18)]";
 const BIZ_SUGGESTION_ITEM_CLASS =
   "cursor-pointer px-[14px] py-[10px] text-[14px] text-[var(--color-text-heading)] hover:bg-[var(--color-surface-muted)]";
 const BIZ_VERIFY_WRAPPER_CLASS = "relative w-full";
 const BIZ_VERIFY_BUTTON_BASE_CLASS =
-  "absolute right-[10px] top-1/2 h-8 -translate-y-1/2 whitespace-nowrap rounded-[8px] border border-[#9cb6d7] bg-[linear-gradient(180deg,#ffffff_0%,#f0f6ff_100%)] px-3 text-[12px] font-semibold text-[#164795] transition-[border-color,background-color,transform] duration-200 ease-in-out hover:border-[#7ea0cb] hover:bg-[#e9f2ff] disabled:cursor-not-allowed disabled:opacity-60";
+  "absolute right-[10px] top-1/2 h-8 -translate-y-1/2 whitespace-nowrap rounded-[8px] border border-[#E0CFA7] bg-[linear-gradient(180deg,#ffffff_0%,#FBF3E0_100%)] px-3 text-[12px] font-semibold text-[#8C6A1E] transition-[border-color,background-color,transform] duration-200 ease-in-out hover:border-[#D6C08E] hover:bg-[#F7EED6] disabled:cursor-not-allowed disabled:opacity-60";
 const BIZ_VERIFY_BUTTON_VERIFIED_CLASS =
   "absolute right-[10px] top-1/2 h-8 -translate-y-1/2 cursor-default whitespace-nowrap rounded-[6px] border border-[var(--color-success)] bg-[var(--color-success)] px-3 text-[12px] text-[var(--color-white)]";
 const BIZ_SECTION_CLASS =
-  "rounded-[18px] border border-[#d5e1f0] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)] p-[20px] shadow-[0_14px_28px_rgba(15,42,85,0.08)]";
+  "rounded-[18px] border border-[#E9D9B6] bg-[linear-gradient(180deg,#ffffff_0%,#FBF6EA_100%)] p-[20px] shadow-[0_14px_28px_rgba(15,42,85,0.08)]";
 const BIZ_HELPER_CLASS = "mt-[7px] text-[12px] text-[var(--color-text-muted)]";
 const BIZ_HELPER_ERROR_CLASS =
   "mt-[7px] text-[12px] font-medium text-[var(--color-danger)]";
@@ -1236,11 +1236,11 @@ function BusinessRegistrationPageContent() {
       backFallback={`${webAppUrl}/`}
     >
       <div className="space-y-4">
-        <div className="rounded-[18px] border border-[#d5e3f3] bg-[linear-gradient(120deg,#f7fbff_0%,#eef5ff_52%,#e8f1ff_100%)] p-5 shadow-[0_16px_32px_rgba(14,48,101,0.10)]">
-          <span className="inline-flex h-6 items-center rounded-full border border-[#bfd2ec] bg-[rgba(255,255,255,0.82)] px-3 text-[11px] font-bold uppercase tracking-[0.08em] text-[#24518c]">
+        <div className="rounded-[18px] border border-[#E9D9B6] bg-[linear-gradient(120deg,#FBF6EA_0%,#F8F0DE_52%,#F4E8D0_100%)] p-5 shadow-[0_16px_32px_rgba(14,48,101,0.10)]">
+          <span className="inline-flex h-6 items-center rounded-full border border-[#E3D0A4] bg-[rgba(255,255,255,0.82)] px-3 text-[11px] font-bold uppercase tracking-[0.08em] text-[#8C6A1E]">
             Dealer Onboarding
           </span>
-          <h2 className="mb-1.5 mt-3 text-[42px] font-semibold leading-[1.06] tracking-[-0.03em] text-[#0b2d66] [@media(max-width:900px)]:text-[34px] [@media(max-width:640px)]:text-[30px]">
+          <h2 className="mb-1.5 mt-3 text-[42px] font-semibold leading-[1.06] tracking-[-0.03em] text-[#4A350F] [@media(max-width:900px)]:text-[34px] [@media(max-width:640px)]:text-[30px]">
             {t.businessRegTitle}
           </h2>
           <p className="mb-0 mt-2 max-w-[72ch] text-[15px] leading-normal text-[#3d5c84] [@media(max-width:900px)]:text-[14px]">
@@ -1248,16 +1248,16 @@ function BusinessRegistrationPageContent() {
           </p>
         </div>
 
-        <div className="rounded-[16px] border border-[#d2deef] bg-[var(--color-white)] p-4 shadow-[0_10px_24px_rgba(15,42,85,0.08)]">
+        <div className="rounded-[16px] border border-[#E7D6B0] bg-[var(--color-white)] p-4 shadow-[0_10px_24px_rgba(15,42,85,0.08)]">
           <div className="mb-3 flex items-center gap-3">
             <div>
-              <p className="mb-1 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#2f5d95]">
+              <p className="mb-1 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#8C6A1E]">
                 Step {currentStep} of {WIZARD_STEPS.length}
               </p>
-              <h3 className="m-0 text-[18px] font-semibold text-[#0c2f63]">
+              <h3 className="m-0 text-[18px] font-semibold text-[#4A350F]">
                 {currentStepMeta.title}
               </h3>
-              <p className="mb-0 mt-1 text-[13px] text-[#4a678d]">{currentStepMeta.subtitle}</p>
+              <p className="mb-0 mt-1 text-[13px] text-[#7B5B1A]">{currentStepMeta.subtitle}</p>
             </div>
           </div>
           <div className="grid grid-cols-5 gap-2 [@media(max-width:900px)]:grid-cols-2">
@@ -1523,7 +1523,7 @@ function BusinessRegistrationPageContent() {
                 <div className="relative" ref={countryDropdownRef}>
                   <button
                     type="button"
-                    className="flex h-[48px] w-full items-center justify-between rounded-[12px] border border-[#c6d6ea] bg-[var(--color-white)] px-[12px] text-left transition-[border-color,box-shadow,transform] duration-200 ease-in-out hover:border-[#8eadcf] focus:border-[#0f4ec9] focus:outline-none focus:[box-shadow:0_0_0_4px_rgba(15,78,201,0.16)]"
+                    className="flex h-[48px] w-full items-center justify-between rounded-[12px] border border-[#E6D6B1] bg-[var(--color-white)] px-[12px] text-left transition-[border-color,box-shadow,transform] duration-200 ease-in-out hover:border-[#D6C08E] focus:border-[#C9A24D] focus:outline-none focus:[box-shadow:0_0_0_4px_rgba(201,162,77,0.20)]"
                     onClick={() => setShowCountries((prev) => !prev)}
                   >
                     <span className="flex min-w-0 items-center gap-2">
@@ -1542,7 +1542,7 @@ function BusinessRegistrationPageContent() {
                   </button>
 
                   {showCountries && (
-                    <div className="absolute left-0 top-[52px] z-[70] max-h-[260px] w-full overflow-y-auto rounded-[12px] border border-[#c6d6ea] bg-[var(--color-white)] shadow-[0_16px_30px_rgba(15,42,85,0.16)]">
+                    <div className="absolute left-0 top-[52px] z-[70] max-h-[260px] w-full overflow-y-auto rounded-[12px] border border-[#E6D6B1] bg-[var(--color-white)] shadow-[0_16px_30px_rgba(15,42,85,0.16)]">
                       {countries.map((item) => (
                         <button
                           type="button"
@@ -1602,8 +1602,8 @@ function BusinessRegistrationPageContent() {
                       type="button"
                       className={`rounded-md border px-2 py-1 text-[12px] ${
                         mobileOtpVia === "whatsapp"
-                          ? "border-[#0f4ec9] bg-[#eaf2ff] text-[#0f4ec9]"
-                          : "border-[#c6d6ea] bg-white text-[#40608a]"
+                          ? "border-[#C9A24D] bg-[#F7EED6] text-[#C9A24D]"
+                          : "border-[#E6D6B1] bg-white text-[#7B5B1A]"
                       }`}
                       onClick={() => setMobileOtpVia("whatsapp")}
                     >
@@ -1613,8 +1613,8 @@ function BusinessRegistrationPageContent() {
                       type="button"
                       className={`rounded-md border px-2 py-1 text-[12px] ${
                         mobileOtpVia === "sms"
-                          ? "border-[#0f4ec9] bg-[#eaf2ff] text-[#0f4ec9]"
-                          : "border-[#c6d6ea] bg-white text-[#40608a]"
+                          ? "border-[#C9A24D] bg-[#F7EED6] text-[#C9A24D]"
+                          : "border-[#E6D6B1] bg-white text-[#7B5B1A]"
                       }`}
                       onClick={() => setMobileOtpVia("sms")}
                     >
@@ -1673,8 +1673,8 @@ function BusinessRegistrationPageContent() {
                         type="button"
                         className={`rounded-md border px-2 py-1 text-[12px] ${
                           whatsappOtpVia === "whatsapp"
-                            ? "border-[#0f4ec9] bg-[#eaf2ff] text-[#0f4ec9]"
-                            : "border-[#c6d6ea] bg-white text-[#40608a]"
+                            ? "border-[#C9A24D] bg-[#F7EED6] text-[#C9A24D]"
+                            : "border-[#E6D6B1] bg-white text-[#7B5B1A]"
                         }`}
                         onClick={() => setWhatsappOtpVia("whatsapp")}
                       >
@@ -1684,8 +1684,8 @@ function BusinessRegistrationPageContent() {
                         type="button"
                         className={`rounded-md border px-2 py-1 text-[12px] ${
                           whatsappOtpVia === "sms"
-                            ? "border-[#0f4ec9] bg-[#eaf2ff] text-[#0f4ec9]"
-                            : "border-[#c6d6ea] bg-white text-[#40608a]"
+                            ? "border-[#C9A24D] bg-[#F7EED6] text-[#C9A24D]"
+                            : "border-[#E6D6B1] bg-white text-[#7B5B1A]"
                         }`}
                         onClick={() => setWhatsappOtpVia("sms")}
                       >
@@ -1849,7 +1849,7 @@ function BusinessRegistrationPageContent() {
           )}
 
           {currentStep === 5 && (
-          <div className="rounded-[18px] border border-[#d5e1f0] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)] p-[16px] shadow-[0_14px_28px_rgba(15,42,85,0.08)]">
+          <div className="rounded-[18px] border border-[#E9D9B6] bg-[linear-gradient(180deg,#ffffff_0%,#FBF6EA_100%)] p-[16px] shadow-[0_14px_28px_rgba(15,42,85,0.08)]">
             <div className="rounded-[16px] border border-[#d6e1f0] bg-white px-4 py-4 shadow-[0_10px_20px_rgba(15,42,85,0.06)]">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
@@ -1883,7 +1883,7 @@ function BusinessRegistrationPageContent() {
                     {onboardingGstPercentage}%
                   </p>
                 </div>
-                <div className="rounded-[14px] border border-[#c8daf3] bg-[linear-gradient(135deg,#eef5ff_0%,#e5efff_100%)] px-4 py-3">
+                <div className="rounded-[14px] border border-[#E5D4AE] bg-[linear-gradient(135deg,#F8F0DE_0%,#e5efff_100%)] px-4 py-3">
                   <p className="text-[12px] text-[#50719b]">Total Payable</p>
                   <p className="mt-1 text-[22px] font-bold text-[#0d3878]">
                     {formatCurrency(onboardingTotalAmount)}
@@ -1891,7 +1891,7 @@ function BusinessRegistrationPageContent() {
                 </div>
               </div>
 
-              <div className="mt-4 rounded-[14px] border border-[#deebf7] bg-[#f7fbff] px-4 py-3 text-[13px] text-[#4a678d]">
+              <div className="mt-4 rounded-[14px] border border-[#EDE1C6] bg-[#FBF6EA] px-4 py-3 text-[13px] text-[#7B5B1A]">
                 {onboardingChargeLoading
                   ? "Fetching onboarding amount..."
                   : onboardingCharge
@@ -1912,7 +1912,7 @@ function BusinessRegistrationPageContent() {
                 <button
                   type="button"
                   onClick={() => setShowTermsModal(true)}
-                  className="border-0 bg-transparent p-0 font-semibold text-[#0f4ec9] underline underline-offset-2"
+                  className="border-0 bg-transparent p-0 font-semibold text-[#C9A24D] underline underline-offset-2"
                 >
                   terms and conditions
                 </button>
@@ -1921,7 +1921,7 @@ function BusinessRegistrationPageContent() {
 
             <PrimaryButton
               className="mt-[18px] min-h-12 rounded-[12px] text-[15px] font-bold tracking-[0.01em]"
-              activeClassName="cursor-pointer bg-[linear-gradient(135deg,#0f4ec9_0%,#0b3ea2_100%)] text-[var(--color-white)] shadow-[0_12px_24px_rgba(15,78,201,0.32)] hover:translate-y-[-1px] hover:shadow-[0_14px_30px_rgba(15,78,201,0.40)]"
+              activeClassName="cursor-pointer bg-[linear-gradient(135deg,#C9A24D_0%,#B4892F_100%)] text-[var(--color-white)] shadow-[0_12px_24px_rgba(201,162,77,0.32)] hover:translate-y-[-1px] hover:shadow-[0_14px_30px_rgba(201,162,77,0.40)]"
               disabledClassName="cursor-not-allowed bg-[var(--color-btn-disabled-bg)] text-[var(--color-btn-disabled-text)]"
               disabled={!isFormComplete || !onboardingCharge || onboardingChargeLoading || loading}
             >
@@ -1930,7 +1930,7 @@ function BusinessRegistrationPageContent() {
           </div>
           )}
 
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-[#d5e1f0] bg-[#f7fbff] px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-[#E9D9B6] bg-[#FBF6EA] px-4 py-3">
             <button
               type="button"
               className="inline-flex h-11 min-w-[130px] items-center justify-center rounded-[10px] border border-[#b6c9e4] bg-[var(--color-white)] px-4 text-[14px] font-semibold text-[#214a81] transition-colors duration-200 hover:bg-[#edf4ff] disabled:cursor-not-allowed disabled:opacity-50"
@@ -1943,14 +1943,14 @@ function BusinessRegistrationPageContent() {
             {currentStep < WIZARD_STEPS.length ? (
               <button
                 type="button"
-                className="inline-flex h-11 min-w-[160px] items-center justify-center rounded-[10px] border border-[#0f4ec9] bg-[linear-gradient(135deg,#0f4ec9_0%,#0b3ea2_100%)] px-4 text-[14px] font-semibold text-[var(--color-white)] shadow-[0_10px_22px_rgba(15,78,201,0.28)] transition-transform duration-200 hover:translate-y-[-1px]"
+                className="inline-flex h-11 min-w-[160px] items-center justify-center rounded-[10px] border border-[#C9A24D] bg-[linear-gradient(135deg,#C9A24D_0%,#B4892F_100%)] px-4 text-[14px] font-semibold text-[var(--color-white)] shadow-[0_10px_22px_rgba(15,78,201,0.28)] transition-transform duration-200 hover:translate-y-[-1px]"
                 onClick={handleNextStep}
                 disabled={loading}
               >
                 Continue
               </button>
             ) : (
-              <span className="text-[13px] font-medium text-[#4a678d]">
+              <span className="text-[13px] font-medium text-[#7B5B1A]">
                 Final step: review details and submit.
               </span>
             )}
@@ -1959,16 +1959,16 @@ function BusinessRegistrationPageContent() {
 
         {otpModalOpen && (
           <div className="fixed inset-0 z-[120] flex items-center justify-center bg-[rgba(6,18,41,0.72)] px-4 backdrop-blur-[2px]">
-            <div className="w-full max-w-[500px] overflow-hidden rounded-[20px] border border-[#cbdcf2] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)] p-0 shadow-[0_28px_56px_rgba(6,25,67,0.34)]">
+            <div className="w-full max-w-[500px] overflow-hidden rounded-[20px] border border-[#E3D1AB] bg-[linear-gradient(180deg,#ffffff_0%,#FBF6EA_100%)] p-0 shadow-[0_28px_56px_rgba(6,25,67,0.34)]">
               <div className="border-b border-[#dce8f7] bg-[linear-gradient(90deg,#ecf4ff_0%,#f8fbff_100%)] px-6 py-4">
-                <span className="inline-flex rounded-full border border-[#c7d9f2] bg-white px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#0070E0]">
+                <span className="inline-flex rounded-full border border-[#c7d9f2] bg-white px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#B4892F]">
                   Security Check
                 </span>
               </div>
 
               <div className="px-6 pb-6 pt-5">
                 <div className="mx-auto w-full max-w-[400px]">
-                  <h3 className="m-0 text-[42px] font-semibold leading-[1.08] tracking-[-0.02em] text-[#0070E0] [@media(max-width:640px)]:text-[30px]">
+                  <h3 className="m-0 text-[42px] font-semibold leading-[1.08] tracking-[-0.02em] text-[#B4892F] [@media(max-width:640px)]:text-[30px]">
                     {t.otpTitle || "Verify OTP"}
                   </h3>
                   <p className="mt-2 text-[14px] text-[#4e6688]">
@@ -1980,13 +1980,13 @@ function BusinessRegistrationPageContent() {
                     onComplete={setOtpCode}
                     resetKey={otpResetKey}
                     wrapperClassName="my-6 gap-3 [@media(max-width:640px)]:gap-2.5"
-                    inputClassName="h-[56px] w-[56px] rounded-[14px] border-[#c6d8f0] bg-white text-[22px] shadow-[inset_0_1px_2px_rgba(18,55,104,0.06)] transition-[border-color,box-shadow,transform] duration-200 ease-in-out focus:border-[#0070E0] focus:[box-shadow:0_0_0_4px_rgba(0,112,224,0.15)] [@media(max-width:640px)]:h-[52px] [@media(max-width:640px)]:w-[52px]"
+                    inputClassName="h-[56px] w-[56px] rounded-[14px] border-[#c6d8f0] bg-white text-[22px] shadow-[inset_0_1px_2px_rgba(18,55,104,0.06)] transition-[border-color,box-shadow,transform] duration-200 ease-in-out focus:border-[#B4892F] focus:[box-shadow:0_0_0_4px_rgba(0,112,224,0.15)] [@media(max-width:640px)]:h-[52px] [@media(max-width:640px)]:w-[52px]"
                   />
 
                   <div className="grid grid-cols-2 gap-3 [@media(max-width:640px)]:gap-2">
                     <button
                       type="button"
-                      className="inline-flex h-11 items-center justify-center rounded-[12px] border border-[#b7cbe6] bg-white px-3 text-[14px] font-semibold text-[#0070E0] transition-[background-color,border-color,color] duration-200 hover:border-[#92b2db] hover:bg-[#eef5ff]"
+                      className="inline-flex h-11 items-center justify-center rounded-[12px] border border-[#E1CFA6] bg-white px-3 text-[14px] font-semibold text-[#B4892F] transition-[background-color,border-color,color] duration-200 hover:border-[#92b2db] hover:bg-[#F8F0DE]"
                       onClick={() => {
                         setOtpModalOpen(false);
                         setOtpCode("");
@@ -1998,7 +1998,7 @@ function BusinessRegistrationPageContent() {
                     </button>
                     <button
                       type="button"
-                      className="inline-flex h-11 items-center justify-center rounded-[12px] bg-[#0070E0] px-3 text-[14px] font-semibold text-[var(--color-white)] shadow-[0_12px_24px_rgba(0,112,224,0.34)] transition-transform duration-200 hover:translate-y-[-1px] hover:bg-[#0061c1] disabled:cursor-not-allowed disabled:bg-[var(--color-btn-disabled-bg)] disabled:text-[var(--color-btn-disabled-text)] disabled:shadow-none"
+                      className="inline-flex h-11 items-center justify-center rounded-[12px] bg-[#B4892F] px-3 text-[14px] font-semibold text-[var(--color-white)] shadow-[0_12px_24px_rgba(0,112,224,0.34)] transition-transform duration-200 hover:translate-y-[-1px] hover:bg-[#0061c1] disabled:cursor-not-allowed disabled:bg-[var(--color-btn-disabled-bg)] disabled:text-[var(--color-btn-disabled-text)] disabled:shadow-none"
                       disabled={otpCode.length !== 4 || verifyingInlineOtp}
                       onClick={() => verifyInlineOtp(otpCode)}
                     >
@@ -2015,7 +2015,7 @@ function BusinessRegistrationPageContent() {
                   <div className="mt-4 text-center">
                     <button
                       type="button"
-                      className="text-[13px] font-semibold text-[#0070E0] underline decoration-[#91baf1] underline-offset-3 disabled:text-[#9aabc4]"
+                      className="text-[13px] font-semibold text-[#B4892F] underline decoration-[#91baf1] underline-offset-3 disabled:text-[#9aabc4]"
                       disabled={inlineOtpCooldown > 0 || resendingInlineOtp}
                       onClick={() => {
                         if (inlineOtpIsEmail) {
@@ -2038,7 +2038,7 @@ function BusinessRegistrationPageContent() {
                     <div className="mt-3 flex items-center justify-center gap-3">
                       <button
                         type="button"
-                        className="inline-flex h-8 items-center justify-center rounded-full border border-[#b9d1ee] bg-white px-3 text-[12px] font-semibold text-[#0070E0] transition-colors duration-200 hover:bg-[#eef5ff]"
+                        className="inline-flex h-8 items-center justify-center rounded-full border border-[#E1CFA6] bg-white px-3 text-[12px] font-semibold text-[#B4892F] transition-colors duration-200 hover:bg-[#F8F0DE]"
                         disabled={resendingInlineOtp}
                         onClick={() => {
                           resendInlineOtp("whatsapp");
@@ -2050,7 +2050,7 @@ function BusinessRegistrationPageContent() {
                       <span className="text-[13px] text-[#9baec8]">or</span>
                       <button
                         type="button"
-                        className="inline-flex h-8 items-center justify-center rounded-full border border-[#b9d1ee] bg-white px-3 text-[12px] font-semibold text-[#0070E0] transition-colors duration-200 hover:bg-[#eef5ff]"
+                        className="inline-flex h-8 items-center justify-center rounded-full border border-[#E1CFA6] bg-white px-3 text-[12px] font-semibold text-[#B4892F] transition-colors duration-200 hover:bg-[#F8F0DE]"
                         disabled={resendingInlineOtp}
                         onClick={() => {
                           resendInlineOtp("sms");
@@ -2097,10 +2097,10 @@ function WizardStepBadge({ title, active, done, locked, onClick }) {
       onClick={onClick}
       className={`rounded-[10px] border px-3 py-2 text-left transition-colors duration-200 ${
         active
-          ? "border-[#1a5ec5] bg-[#eaf2ff]"
+          ? "border-[#1a5ec5] bg-[#F7EED6]"
           : done
           ? "border-[#b8e8cc] bg-[#f2fbf6]"
-          : "border-[#d4e1f1] bg-[#f7fbff]"
+          : "border-[#E9D9B6] bg-[#FBF6EA]"
       } ${locked ? "cursor-not-allowed opacity-55" : "cursor-pointer hover:bg-[#ecf4ff]"}`}
     >
       <div className="flex items-center justify-between gap-2">
@@ -2116,3 +2116,4 @@ function WizardStepBadge({ title, active, done, locked, onClick }) {
     </button>
   );
 }
+

@@ -86,7 +86,7 @@ export default function DatePicker({ value, onChange }) {
           value={formatDate()}
           placeholder="DD / MM / YYYY"
           onClick={() => setOpen(!open)}
-          className="h-[44px] w-full rounded-xl border border-gray-300 px-4 pr-10 text-sm text-gray-800 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition cursor-pointer"
+          className="h-[44px] w-full rounded-xl border border-gray-300 px-4 pr-10 text-sm text-gray-800 placeholder:text-gray-400 focus:border-[#C9A24D] focus:ring-2 focus:ring-[rgba(201,162,77,0.25)] outline-none transition cursor-pointer"
         />
 
         {/* Icon */}
@@ -114,7 +114,7 @@ export default function DatePicker({ value, onChange }) {
             {step !== "year" && (
               <button
                 onClick={() => setStep(step === "day" ? "month" : "year")}
-                className="text-xs text-blue-600 hover:underline"
+                className="text-xs text-[#B4892F] hover:underline"
               >
                 Back
               </button>
@@ -130,7 +130,7 @@ export default function DatePicker({ value, onChange }) {
                   onClick={() => handleYear(y)}
                   className={`py-2 rounded-lg text-sm font-medium transition ${
                     year === y
-                      ? "bg-blue-600 text-white"
+                      ? "bg-[#C9A24D] text-white"
                       : "hover:bg-gray-100"
                   }`}
                 >
@@ -149,7 +149,7 @@ export default function DatePicker({ value, onChange }) {
                   onClick={() => handleMonth(i)}
                   className={`py-2 rounded-lg text-sm font-medium transition ${
                     month === i
-                      ? "bg-blue-600 text-white"
+                      ? "bg-[#C9A24D] text-white"
                       : "hover:bg-gray-100"
                   }`}
                 >
@@ -168,7 +168,7 @@ export default function DatePicker({ value, onChange }) {
                   onClick={() => handleDay(d)}
                   className={`h-8 flex items-center justify-center rounded-md text-xs transition ${
                     day === d
-                      ? "bg-blue-600 text-white"
+                      ? "bg-[#C9A24D] text-white"
                       : "hover:bg-gray-100"
                   }`}
                 >

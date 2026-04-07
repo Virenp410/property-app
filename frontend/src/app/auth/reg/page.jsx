@@ -681,7 +681,7 @@ function RegistrationFormContent() {
             <button
               type="button"
               onClick={() => setShowTermsModal(true)}
-              className="border-0 bg-transparent p-0 font-semibold text-[#0f4ec9] underline underline-offset-2"
+              className="border-0 bg-transparent p-0 font-semibold text-[#C9A24D] underline underline-offset-2"
             >
               terms and conditions
             </button>
@@ -716,3 +716,4 @@ export default function RegistrationForm() {
     </Suspense>
   );
 }
+

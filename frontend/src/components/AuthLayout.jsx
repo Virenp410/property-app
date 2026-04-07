@@ -25,7 +25,7 @@ export default function AuthLayout({
   const cardClasses =
     isRegVariant
       ? "max-w-[980px] rounded-[16px] p-8 [@media(max-width:1100px)]:max-w-full [@media(max-width:900px)]:rounded-[12px] [@media(max-width:900px)]:px-4 [@media(max-width:900px)]:py-5"
-      : "max-w-[420px] rounded-[14px] p-5";
+      : "max-w-[420px] rounded-[14px] p-6";
   const shellClasses =
     isRegVariant
       ? "bg-[radial-gradient(1200px_420px_at_10%_-10%,rgba(15,78,201,0.12),transparent_58%),radial-gradient(1000px_360px_at_90%_-20%,rgba(27,150,255,0.09),transparent_62%),linear-gradient(180deg,#f2f6fc_0%,#edf3fb_100%)]"
@@ -37,7 +37,7 @@ export default function AuthLayout({
     ? undefined
     : {
         backgroundImage:
-          "linear-gradient(160deg, rgba(4, 22, 52, 0.58) 0%, rgba(6, 27, 64, 0.48) 42%, rgba(6, 19, 45, 0.62) 100%), url('/auth-bg.jpg')",
+          "linear-gradient(160deg, rgba(12, 8, 2, 0.60) 0%, rgba(22, 14, 4, 0.46) 48%, rgba(10, 6, 0, 0.64) 100%), url('/auth-bg.jpg')",
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
@@ -49,18 +49,18 @@ export default function AuthLayout({
       style={defaultAuthBackgroundStyle}
     >
       <div
-        className={`w-full bg-[var(--color-white)] text-[var(--color-black)] shadow-[0_20px_44px_rgba(17,35,67,0.16)] ${cardClasses} ${cardClassName}`}
+        className={`w-full bg-[var(--color-white)] text-[var(--color-black)] ${isRegVariant ? "" : "border-t-[3px] border-t-[var(--color-brand-primary)]"} shadow-[0_24px_64px_rgba(0,0,0,0.26),0_4px_18px_rgba(0,0,0,0.12)] ${cardClasses} ${cardClassName}`}
       >
-        <div className="mb-6 flex items-start justify-between [@media(max-width:900px)]:mb-[18px] [@media(max-width:900px)]:flex-wrap [@media(max-width:900px)]:gap-[10px]">
-          <div className="block">
+        <div className="mb-5 flex items-center justify-between [@media(max-width:900px)]:mb-[14px] [@media(max-width:900px)]:flex-wrap [@media(max-width:900px)]:gap-[10px]">
+          <div className="flex flex-col">
             <Link
               href={`${webAppUrl}/`}
               className="flex items-center leading-none no-underline"
-              aria-label="SeaNeB Home"
+              aria-label="SeaNeB Realty Home"
             >
               <Image
                 src={logoSrc}
-                alt="SeaNeB Autos"
+                alt="SeaNeB Realty"
                 width={150}
                 height={40}
                 className="block h-auto w-[150px] object-contain"
@@ -83,5 +83,3 @@ export default function AuthLayout({
     </div>
   );
 }
- 
-// Main Branch conflict resolve

@@ -1,5 +1,9 @@
 import { redirect } from "next/navigation";
 
+export const metadata = {
+  title: "About SeaNeB Realty | India's Trusted Hyperlocal Real Estate Platform",
+};
+
 const getWebAppUrl = () =>
   String(
     process.env.NEXT_PUBLIC_WEB_APP_URL || process.env.NEXT_PUBLIC_APP_URL || ""

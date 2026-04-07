@@ -255,9 +255,14 @@ function VerifyOtpContent() {
 
   return (
     <AuthLayout lang={lang} onLangChange={setLang} showBack={false}>
-      <div className="mx-auto max-w-105 text-center">
-        <h2 className="mb-1.5 text-[26px] font-semibold">{t.otpTitle}</h2>
-        <p className="mb-5.5 text-[14px] text-[#666666]">{subtitle}</p>
+      <div className="mx-auto max-w-[340px] text-center">
+        <h2 className="mb-1.5 text-[24px] font-bold text-[var(--color-text-heading)] tracking-tight">
+          {t.otpTitle}
+        </h2>
+        <p className="mb-1 text-[13.5px] text-[var(--auth-subtle)]">{subtitle}</p>
+        <p className="mb-1 text-[12px] text-[var(--auth-subtle)]">
+          Check your {isEmail ? "inbox" : "messages"} for the 4-digit code
+        </p>
 
         <OtpInput length={4} onComplete={setFinalOtp} />
 
@@ -269,26 +274,32 @@ function VerifyOtpContent() {
           {loading ? t.verifying : t.verifyOtp}
         </PrimaryButton>
 
-        {infoMessage && <p className="mt-3 text-[13px] text-(--auth-muted)">{infoMessage}</p>}
+        {infoMessage && (
+          <p className="mt-3 text-[13px] text-[var(--color-danger)]">{infoMessage}</p>
+        )}
 
-        <div className="mt-3.5 text-center">
-          <button
-            className="cursor-pointer border-0 bg-transparent p-0 text-[14px] text-[#1a73e8] underline disabled:cursor-not-allowed disabled:text-[#aaaaaa]"
-            disabled={cooldown > 0}
-            onClick={() => {
-              if (isEmail) resend();
-              else setShowResendOptions((prev) => !prev);
-            }}
-          >
-            {cooldown > 0
-              ? t.resendAvailableIn.replace("{{seconds}}", cooldown)
-              : t.resendOtp}
-          </button>
+        <div className="mt-4 text-center">
+          {cooldown > 0 ? (
+            <p className="text-[13px] text-[var(--auth-muted)]">
+              {t.resendAvailableIn.replace("{{seconds}}", cooldown)}
+            </p>
+          ) : (
+            <button
+              className="cursor-pointer border-0 bg-transparent p-0 text-[13.5px] font-medium text-[var(--color-brand-primary)] underline underline-offset-2 transition-colors duration-150 hover:text-[var(--color-brand-secondary)] disabled:cursor-not-allowed disabled:text-[#aaaaaa]"
+              disabled={cooldown > 0}
+              onClick={() => {
+                if (isEmail) resend();
+                else setShowResendOptions((prev) => !prev);
+              }}
+            >
+              {t.resendOtp}
+            </button>
+          )}
 
           {!isEmail && showResendOptions && cooldown === 0 && (
-            <div className="mt-2 flex items-center justify-center gap-2.5">
+            <div className="mt-2.5 flex items-center justify-center gap-2">
               <button
-                className="cursor-pointer border-0 bg-transparent p-0 text-[14px] text-[#1a73e8] disabled:cursor-not-allowed disabled:text-[#aaaaaa]"
+                className="rounded-[8px] border border-[var(--color-border-brand-soft)] bg-[var(--color-page-bg-soft)] px-3 py-1.5 text-[13px] font-medium text-[var(--color-brand-primary)] transition-colors duration-150 hover:bg-[var(--color-surface-muted)] disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={resending}
                 onClick={() => {
                   resend("whatsapp");
@@ -297,9 +308,8 @@ function VerifyOtpContent() {
               >
                 {t.viaWhatsapp}
               </button>
-              <span className="text-[14px] text-[#999999]">|</span>
               <button
-                className="cursor-pointer border-0 bg-transparent p-0 text-[14px] text-[#1a73e8] disabled:cursor-not-allowed disabled:text-[#aaaaaa]"
+                className="rounded-[8px] border border-[var(--color-border-brand-soft)] bg-[var(--color-page-bg-soft)] px-3 py-1.5 text-[13px] font-medium text-[var(--color-brand-primary)] transition-colors duration-150 hover:bg-[var(--color-surface-muted)] disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={resending}
                 onClick={() => {
                   resend("sms");

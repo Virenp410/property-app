@@ -58,7 +58,7 @@ export default function OtpInput({
 
   return (
     <div
-      className={`my-6 flex justify-center gap-[14px] ${wrapperClassName}`.trim()}
+      className={`my-6 flex justify-center gap-[12px] ${wrapperClassName}`.trim()}
     >
       {otp.map((digit, i) => (
         <input
@@ -72,7 +72,7 @@ export default function OtpInput({
           value={digit}
           onChange={(e) => handleChange(e.target.value, i)}
           onKeyDown={(e) => handleKeyDown(e, i)}
-          className={`h-[52px] w-[52px] rounded-[12px] border border-[#dcdcdc] text-center text-[18px] [-webkit-text-security:disc] [text-security:disc] focus:border-[var(--auth-border-strong)] focus:outline-none ${inputClassName}`.trim()}
+          className={`h-[56px] w-[56px] rounded-[12px] border-[1.5px] border-[#e0e0e0] text-center text-[20px] font-semibold text-[var(--color-text-heading)] [-webkit-text-security:disc] [text-security:disc] transition-all duration-200 focus:border-[var(--color-brand-primary)] focus:outline-none focus:[box-shadow:0_0_0_3px_rgba(201,162,77,0.20)] ${digit ? "border-[var(--color-brand-primary)] bg-[var(--color-page-bg-soft)]" : "bg-white"} ${inputClassName}`.trim()}
         />
       ))}
     </div>

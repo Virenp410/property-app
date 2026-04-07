@@ -4,11 +4,11 @@ import AuthSessionRestore from "@/components/AuthSessionRestore";
 
 export const metadata = {
   title: {
-    default: "SeaNeB Autos",
-    template: "%s | SeaNeB Autos",
+    default: "SeaNeB Realty",
+    template: "%s | SeaNeB Realty",
   },
   description:
-    "Discover your perfect used car with SeaNeB Autos. Our user-friendly platform connects buyers and sellers, offering a wide selection of quality pre-owned vehicles. Experience seamless transactions, transparent pricing, and trusted reviews. Find your next car today with SeaNeB Autos.",
+    "SeaNeB Realty is India's trusted hyperlocal real estate platform. Discover verified listings, transparent pricing, and local market clarity to buy, sell, or rent with confidence.",
   icons: {
     icon: "/favicon.png?v=5",
     shortcut: "/favicon.png?v=5",
