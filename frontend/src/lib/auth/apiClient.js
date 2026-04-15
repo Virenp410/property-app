@@ -267,6 +267,26 @@ const handleRefreshError = (err) => {
 apiClient.interceptors.request.use(async (config) => {
   const url = String(config?.url || "");
   config.headers = config.headers || {};
+
+  // Let the browser set the correct multipart boundary for FormData requests.
+  // Our axios instance defaults `Content-Type: application/json`, which breaks uploads if not removed.
+  const isFormData =
+    typeof FormData !== "undefined" && config.data instanceof FormData;
+  if (isFormData) {
+    const deleteHeader = (key) => {
+      if (!config.headers) return;
+      if (typeof config.headers.delete === "function") {
+        config.headers.delete(key);
+        return;
+      }
+      delete config.headers[key];
+      delete config.headers[key.toLowerCase()];
+      delete config.headers[key.toUpperCase()];
+    };
+
+    deleteHeader("Content-Type");
+    deleteHeader("content-type");
+  }
   const deviceId = getDeviceId();
   if (deviceId) {
     const method = String(config?.method || "get").toLowerCase();

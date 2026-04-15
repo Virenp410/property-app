@@ -124,6 +124,19 @@ const parseJsonBody = (rawBody) => {
 const shouldSendBody = (method) =>
   !["GET", "HEAD"].includes(String(method || "").toUpperCase());
 
+const isJsonContentType = (value) => {
+  const contentType = String(value || "").toLowerCase();
+  return contentType.includes("application/json") || contentType.includes("+json");
+};
+
+const isTextContentType = (value) => {
+  const contentType = String(value || "").toLowerCase();
+  if (!contentType) return false;
+  if (contentType.startsWith("text/")) return true;
+  if (contentType.includes("application/x-www-form-urlencoded")) return true;
+  return false;
+};
+
 const decodeJwtPayload = (token) => {
   const value = String(token || "").trim();
   if (!value) return null;
@@ -302,8 +315,24 @@ const handleProxy = async (request, context) => {
     );
   }
 
-  const rawBody = shouldSendBody(method) ? await request.text() : "";
-  const payload = parseJsonBody(rawBody);
+  const contentType = String(request.headers.get("content-type") || "").trim();
+  const shouldBody = shouldSendBody(method);
+
+  let rawBodyText = "";
+  let rawBodyBinary = null;
+
+  if (shouldBody) {
+    if (isJsonContentType(contentType) || isTextContentType(contentType)) {
+      rawBodyText = await request.text();
+    } else {
+      // Important: preserve binary payloads (e.g. multipart/form-data uploads)
+      // Reading as text corrupts the bytes and breaks image uploads.
+      const buf = await request.arrayBuffer();
+      rawBodyBinary = Buffer.from(buf);
+    }
+  }
+
+  const payload = isJsonContentType(contentType) ? parseJsonBody(rawBodyText) : {};
   const productKey = getProductKey(request, payload);
 
   const headers = buildProxyHeaders(request, productKey);
@@ -314,13 +343,13 @@ const handleProxy = async (request, context) => {
       method,
       headers: nextHeaders,
       cache: "no-store",
-      body: shouldSendBody(method) ? nextBody : undefined,
+      body: shouldBody ? nextBody : undefined,
     });
   };
 
   let upstream;
   try {
-    upstream = await sendUpstream(headers, rawBody);
+    upstream = await sendUpstream(headers, rawBodyBinary ?? rawBodyText);
   } catch {
     return NextResponse.json(
       {

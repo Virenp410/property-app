@@ -15,6 +15,8 @@ export default function AuthLayout({
   logoBg = "light",
   showBack = false,
   backFallback = "/auth/login",
+  headerLeft = null,
+  headerRight = null,
 }) {
   const logoSrc =
     logoBg === "dark" ? "/logo/white-logo-2.png" : "/logo/white-logo-3.svg";
@@ -52,30 +54,39 @@ export default function AuthLayout({
         className={`w-full bg-[var(--color-white)] text-[var(--color-black)] ${isRegVariant ? "" : "border-t-[3px] border-t-[var(--color-brand-primary)]"} shadow-[0_24px_64px_rgba(0,0,0,0.26),0_4px_18px_rgba(0,0,0,0.12)] ${cardClasses} ${cardClassName}`}
       >
         <div className="mb-5 flex items-center justify-between [@media(max-width:900px)]:mb-[14px] [@media(max-width:900px)]:flex-wrap [@media(max-width:900px)]:gap-[10px]">
-          <div className="flex flex-col">
-            <Link
-              href={`${webAppUrl}/`}
-              className="flex items-center leading-none no-underline"
-              aria-label="SeaNeB Realty Home"
-            >
-              <Image
-                src={logoSrc}
-                alt="SeaNeB Realty"
-                width={150}
-                height={40}
-                className="block h-auto w-[150px] object-contain"
-                priority
-              />
-            </Link>
-            {showBack && (
-              <BackButton className="auth-back-btn" fallbackPath={backFallback} />
-            )}
-          </div>
-
-          {showLang && onLangChange && (
-            <div className="flex-[0_0_124px] [@media(max-width:900px)]:flex-[0_0_108px]">
-              <LangSelect value={lang} onChange={onLangChange} variant="lang" />
+          {headerLeft ? (
+            <div className="flex flex-col">{headerLeft}</div>
+          ) : (
+            <div className="flex flex-col">
+              <Link
+                href={`${webAppUrl}/`}
+                className="flex items-center leading-none no-underline"
+                aria-label="SeaNeB Realty Home"
+              >
+                <Image
+                  src={logoSrc}
+                  alt="SeaNeB Realty"
+                  width={150}
+                  height={150}
+                  className={`block h-auto object-contain ${isRegVariant ? "w-[110px]" : "w-[90px]"}`}
+                  priority
+                />
+              </Link>
+              {showBack && (
+                <BackButton className="auth-back-btn" fallbackPath={backFallback} />
+              )}
             </div>
+          )}
+
+          {headerRight ? (
+            <div className="ml-auto">{headerRight}</div>
+          ) : (
+            showLang &&
+            onLangChange && (
+              <div className="flex-[0_0_124px] [@media(max-width:900px)]:flex-[0_0_108px]">
+                <LangSelect value={lang} onChange={onLangChange} variant="lang" />
+              </div>
+            )
           )}
         </div>
         {children}

@@ -195,7 +195,6 @@ function BusinessRegistrationPageContent() {
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [branchId, setBranchId] = useState("");
   const [sessionExpired, setSessionExpired] = useState(false);
-  const [businessCheckDone, setBusinessCheckDone] = useState(false);
   const [country, setCountry] = useState(() => getCountryByCode("91"));
   const [showCountries, setShowCountries] = useState(false);
   const [displayNameManuallyEdited, setDisplayNameManuallyEdited] = useState(false);
@@ -740,49 +739,6 @@ function BusinessRegistrationPageContent() {
   };
 
   useEffect(() => {
-    let active = true;
-
-    const checkExistingBusiness = async () => {
-      try {
-        if (!active) return;
-
-        const profileRes = await retryWithSessionRefresh(() =>
-          api.get("/v1/profile/me", {
-            params: {
-              _t: Date.now(),
-            },
-            headers: { "x-product-key": PRODUCT_KEY },
-          })
-        );
-        const profilePayload = profileRes?.data || {};
-        const profileData =
-          profilePayload?.data && typeof profilePayload.data === "object"
-            ? profilePayload.data
-            : profilePayload;
-        const profileRegistered =
-          profileData?.is_business_registered === true ||
-          profileData?.isBusinessRegistered === true;
-
-        if (profileRegistered) {
-          setCookie("dashboard_mode", "dealer", { days: 365 });
-          redirectToDealerDashboard();
-        }
-      } catch (err) {
-        if (isUnauthorizedError(err)) {
-          return;
-        }
-      } finally {
-        if (active) setBusinessCheckDone(true);
-      }
-    };
-
-    checkExistingBusiness();
-    return () => {
-      active = false;
-    };
-  }, [redirectToDealerDashboard, retryWithSessionRefresh, router]);
-
-  useEffect(() => {
     if (sessionExpired) {
       setBusinessSuggestions([]);
       setBusinessSuggestionError("Session expired. Please login again.");
@@ -1224,8 +1180,6 @@ function BusinessRegistrationPageContent() {
       submitLockRef.current = false;
     }
   };
-
-  if (!businessCheckDone) return null;
 
   return (
     <AuthLayout

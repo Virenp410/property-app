@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from "react";
 export default function ProfileDropdown({
   fullName,
   seanebId,
+  onAccount,
+  onSwitchProfile,
   onLogout,
 }) {
   const [open, setOpen] = useState(false);
@@ -29,24 +31,46 @@ export default function ProfileDropdown({
     <div className="relative ml-auto" ref={menuRef}>
       <button
         type="button"
-        className="max-w-[240px] min-w-[150px] cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap rounded-[11px] border border-[var(--color-brand-primary)] bg-[linear-gradient(135deg,var(--color-brand-primary)_0%,var(--color-brand-secondary)_100%)] px-[18px] py-[8px] text-[14px] font-semibold text-[var(--color-white)] transition-[transform,box-shadow,background] duration-200 ease-in-out hover:translate-y-[-1px] hover:bg-[linear-gradient(135deg,var(--color-brand-secondary)_0%,var(--color-brand-primary)_100%)]"
+        className="min-w-[160px] max-w-[240px] rounded-[14px] border border-[#e6e8ee] bg-white px-4 py-2 text-left text-[12px] font-semibold text-[#1f2937] shadow-[0_10px_18px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-[#C9A24D]"
         onClick={() => setOpen((prev) => !prev)}
         aria-expanded={open}
         aria-haspopup="true"
       >
-        {displayName}
+        <span className="block truncate">{displayName}</span>
+        <span className="block truncate text-[11px] font-medium text-[#98a2b3]">{displaySeanebId}</span>
       </button>
 
       {open && (
-        <div className="absolute right-0 top-[calc(100%+10px)] z-[220] w-[min(340px,calc(100vw-28px))] rounded-[14px] border border-[#d8e6f3] bg-[var(--color-white)] p-3 shadow-[0_16px_32px_rgba(10,31,54,0.18)]">
+        <div className="absolute right-0 top-[calc(100%+10px)] z-[220] w-[min(340px,calc(100vw-28px))] rounded-[16px] border border-[#e6e8ee] bg-white p-3 shadow-[0_18px_34px_rgba(15,23,42,0.14)]">
+          <div className="px-2 pb-2 text-[13px] font-semibold text-[#1f2937]">{displayName}</div>
           <div className="grid grid-cols-1 gap-2">
             <ProfileRow label="Full Name" value={displayName} />
             <ProfileRow label="SeaNeB ID" value={displaySeanebId} />
           </div>
-          <div className="mt-[10px] grid grid-cols-1 gap-2">
+          <div className="mt-3 grid grid-cols-1 gap-2">
             <button
               type="button"
-              className="inline-flex min-h-[38px] cursor-pointer items-center justify-center rounded-[10px] border border-[#cf3d3d] bg-[#fff5f5] text-[13px] font-semibold text-[#a21f1f]"
+              className="inline-flex min-h-[40px] items-center justify-center rounded-[10px] border border-[#e6e8ee] bg-white text-[13px] font-semibold text-[#344054] transition hover:border-[#C9A24D] hover:text-[#7a5b22]"
+              onClick={() => {
+                setOpen(false);
+                onAccount?.();
+              }}
+            >
+              My Account
+            </button>
+            <button
+              type="button"
+              className="inline-flex min-h-[40px] items-center justify-center rounded-[10px] border border-[#e6e8ee] bg-white text-[13px] font-semibold text-[#344054] transition hover:border-[#C9A24D] hover:text-[#7a5b22]"
+              onClick={() => {
+                setOpen(false);
+                onSwitchProfile?.();
+              }}
+            >
+              Switch to Dealer Profile
+            </button>
+            <button
+              type="button"
+              className="inline-flex min-h-[40px] items-center justify-center rounded-[10px] border border-[#f1c0c0] bg-[#fff6f6] text-[13px] font-semibold text-[#b42318]"
               onClick={() => {
                 setOpen(false);
                 onLogout?.();
@@ -63,9 +87,9 @@ export default function ProfileDropdown({
 
 function ProfileRow({ label, value }) {
   return (
-    <div className="flex items-baseline justify-between gap-2 rounded-[8px] bg-[var(--color-page-bg-soft)] px-2 py-[6px]">
-      <span className="text-[12px] text-[#5c7086]">{label}</span>
-      <strong className="text-right text-[13px] text-[#0f2f54]">{String(value || "-")}</strong>
+    <div className="flex items-baseline justify-between gap-2 rounded-[10px] border border-[#eef0f4] bg-[#f9fafc] px-2 py-[6px]">
+      <span className="text-[12px] text-[#667085]">{label}</span>
+      <strong className="text-right text-[13px] text-[#1f2937]">{String(value || "-")}</strong>
     </div>
   );
 }

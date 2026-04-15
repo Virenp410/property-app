@@ -35,7 +35,7 @@ export default function CustomDropdown({
     : "relative w-full text-[14px]";
 
   const triggerClasses = isLang
-    ? "flex h-[44px] cursor-pointer items-center justify-between rounded-[12px] border border-[var(--auth-border-strong)] bg-[var(--color-white)] px-[10px] py-2"
+    ? "flex h-[44px] cursor-pointer items-center justify-between rounded-[10px] border border-[var(--auth-border-strong)] bg-[var(--color-white)] px-[10px] py-2"
     : "flex h-[44px] cursor-pointer items-center justify-between rounded-[10px] border border-[var(--auth-border-strong)] bg-[var(--color-white)] px-[14px] py-3";
 
   const selectedWrapClasses = isLang
