@@ -1,5 +1,4 @@
 import "./globals.css";
-import Script from "next/script";
 import AuthSessionRestore from "@/components/AuthSessionRestore";
 
 export const metadata = {
@@ -21,10 +20,6 @@ export default function RootLayout({ children }) {
     <html lang="en" data-scroll-behavior="smooth">
       <body className="[-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]">
         <AuthSessionRestore />
-        <Script
-          src="https://sdk.cashfree.com/js/v3/cashfree.js"
-          strategy="afterInteractive"
-        />
         {children}
       </body>
     </html>

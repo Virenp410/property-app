@@ -20,6 +20,7 @@ import {
   getBusinessAutocomplete,
   getOnboardingChargePreview,
   registerBusiness,
+  verifyOnboardingPayment,
   verifyPanForBranch as verifyPan,
   verifyGstForBranch as verifyGstin,
 } from "@/services/business.services";
@@ -35,6 +36,7 @@ import {
 import { PRODUCT_KEY } from "@/lib/productKey";
 import { refreshAccessToken } from "@/lib/auth/apiClient";
 import { getOrCreateDeviceId } from "@/lib/deviceId";
+import { getCashfreeClient } from "@/lib/payments/cashfreeClient";
 
 const EMPTY_FORM = {
   country_code: "91",
@@ -140,10 +142,44 @@ const BIZ_HELPER_SUCCESS_CLASS =
 const BUSINESS_SEANEB_VERIFIED_COOKIE = "business_seaneb_id_verified";
 const VERIFIED_BUSINESS_SEANEB_ID_COOKIE = "verified_business_seaneb_id";
 const SESSION_EXPIRED_REDIRECT_DELAY_MS = 20 * 60 * 1000;
-const normalizePhotoReferences = (value) =>
-  Array.isArray(value)
-    ? value.map((item) => String(item || "").trim()).filter(Boolean)
-    : [];
+const normalizePhotoReferences = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .flatMap((item) => {
+        if (typeof item === "string") return item.trim();
+        if (item && typeof item === "object") {
+          return [
+            String(
+              item.photo_reference ||
+                item.photo_reference_id ||
+                item.reference ||
+                item ||
+                ""
+            ).trim(),
+          ];
+        }
+        return [];
+      })
+      .filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed ? [trimmed] : [];
+  }
+
+  if (value && typeof value === "object") {
+    const reference = String(
+      value.photo_reference ||
+        value.photo_reference_id ||
+        value.reference ||
+        ""
+    ).trim();
+    return reference ? [reference] : [];
+  }
+
+  return [];
+};
 const formatCurrency = (value) =>
   new Intl.NumberFormat("en-IN", {
     style: "currency",
@@ -162,9 +198,7 @@ export default function BusinessRegistrationPage() {
 function BusinessRegistrationPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const webAppUrl = String(
-    process.env.NEXT_PUBLIC_AUTH_APP_URL || process.env.NEXT_PUBLIC_APP_URL || ""
-  ).replace(/\/$/, "");
+  const listingUrl = String(process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/$/, "");
   const [lang, setLang] = useAppLang(searchParams);
   const t = useTranslation(lang);
   const [loading, setLoading] = useState(false);
@@ -227,6 +261,7 @@ function BusinessRegistrationPageContent() {
     }
   }, []);
 
+
   const redirectToDealerDashboard = useCallback(() => {
     router.replace("/auth/dealerdash");
   }, [router]);
@@ -237,36 +272,50 @@ function BusinessRegistrationPageContent() {
       return;
     }
 
-    const configuredListingUrl = String(process.env.NEXT_PUBLIC_LISTING_URL || "").trim();
-    if (configuredListingUrl) {
-      window.location.href = configuredListingUrl;
-      return;
-    }
-
     redirectToDealerDashboard();
   }, [redirectToDealerDashboard]);
 
-  // Starts the Cashfree modal checkout using the payment session returned by registration.
-  const startPayment = useCallback((sessionId) => {
-    try {
-      const cashfreeFactory = window?.Cashfree;
-      if (typeof cashfreeFactory !== "function") {
-        throw new Error("Cashfree SDK is not loaded.");
+  // Starts the Cashfree drop-in modal checkout using the payment session returned by registration.
+  const startPayment = useCallback(
+    async (sessionId) => {
+      const resolvedSessionId = String(sessionId || "").trim();
+      if (!resolvedSessionId) return false;
+
+      try {
+        const cashfree = await getCashfreeClient({
+          mode: process.env.NEXT_PUBLIC_CASHFREE_MODE || "sandbox",
+        });
+        if (!cashfree) {
+          throw new Error("Cashfree SDK is not available.");
+        }
+
+        return await new Promise((resolve) => {
+          cashfree.checkout({
+            paymentSessionId: resolvedSessionId,
+            redirectTarget: "_modal",
+            onSuccess: async (e) => {
+              console.log("[BusinessReg] Payment Success:", e);
+              await verifyOnboardingPayment({ paymentSessionId: resolvedSessionId });
+              resolve(true);
+            },
+            onFailure: (e) => {
+              console.error("[BusinessReg] Payment Failed:", e);
+              resolve(false);
+            },
+            onClose: () => {
+              console.log("[BusinessReg] Checkout closed");
+              resolve(false);
+            },
+          });
+        });
+      } catch (err) {
+        console.error("Payment error:", err);
+        setErrorMessage("Payment start failed. Please try again.");
+        return false;
       }
-
-      const cashfree = cashfreeFactory({
-        mode: String(process.env.NEXT_PUBLIC_CASHFREE_MODE || "sandbox"),
-      });
-
-      cashfree.checkout({
-        paymentSessionId: sessionId,
-        redirectTarget: "_modal",
-      });
-    } catch (err) {
-      console.error("Payment error:", err);
-      setErrorMessage("Payment start failed. Please try again.");
-    }
-  }, []);
+    },
+    []
+  );
 
   // Loads the backend-provided onboarding amount shown on the final payment step.
   const loadOnboardingCharge = useCallback(async () => {
@@ -726,7 +775,28 @@ function BusinessRegistrationPageContent() {
       }));
       return;
     }
-    setForm((prev) => ({ ...prev, place: value }));
+
+    setForm((prev) => {
+      const previousPlaceId = String(prev.place?.place_id || "").trim();
+      const nextPlaceId = String(value.place_id || "").trim();
+      const existingPhotoReferences = normalizePhotoReferences(prev.place?.photo_references);
+      const nextPhotoReferences = normalizePhotoReferences(
+        value.photo_references ?? value.photo_reference
+      );
+      return {
+        ...prev,
+        place: {
+          ...prev.place,
+          ...value,
+          photo_references:
+            nextPhotoReferences.length > 0
+              ? nextPhotoReferences
+              : nextPlaceId && nextPlaceId === previousPlaceId
+              ? existingPhotoReferences
+              : [],
+        },
+      };
+    });
   };
 
   const handleCountrySelect = (selectedCountry) => {
@@ -1155,12 +1225,18 @@ function BusinessRegistrationPageContent() {
 
       if (paymentSessionId) {
         // If payment is required, launch Cashfree checkout and then continue the onboarding redirect.
-        setSuccessMessage("Redirecting to payment...");
-        startPayment(paymentSessionId);
+        setSuccessMessage("Opening payment...");
+        const paid = await startPayment(paymentSessionId);
+        if (!paid) {
+          setSuccessMessage("");
+          setErrorMessage("Payment not completed. Please try again.");
+          return;
+        }
 
+        setSuccessMessage("Payment successful. Redirecting...");
         window.setTimeout(() => {
           redirectAfterRegistration();
-        }, 5000);
+        }, 800);
         return;
       }
 
@@ -1187,7 +1263,7 @@ function BusinessRegistrationPageContent() {
       onLangChange={setLang}
       variant="reg"
       showBack={true}
-      backFallback={`${webAppUrl}/`}
+      backFallback={`${listingUrl}/`}
     >
       <div className="space-y-4">
         <div className="rounded-[18px] border border-[#E9D9B6] bg-[linear-gradient(120deg,#FBF6EA_0%,#F8F0DE_52%,#F4E8D0_100%)] p-5 shadow-[0_16px_32px_rgba(14,48,101,0.10)]">
@@ -1315,11 +1391,9 @@ function BusinessRegistrationPageContent() {
                                   handleChange("place", {
                                     label: businessLabel,
                                     place_id: businessPlaceId,
-                                    photo_references: Array.isArray(
-                                      business.photo_references
-                                    )
-                                      ? business.photo_references
-                                      : [],
+                                    photo_references: normalizePhotoReferences(
+                                      business.photo_references ?? business.photo_reference
+                                    ),
                                   });
                                 }
                               }}

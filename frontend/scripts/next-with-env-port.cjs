@@ -14,8 +14,8 @@ const parsePortFromUrl = (value) => {
 
 const mode = process.argv[2];
 const passthroughArgs = process.argv.slice(3);
-const fallbackPort = parsePortFromUrl(process.env.NEXT_PUBLIC_AUTH_APP_URL);
-const port = String(process.env.PORT || fallbackPort || "3000");
+const fallbackPort = parsePortFromUrl(process.env.NEXT_PUBLIC_APP_URL);
+const port = String(fallbackPort || process.env.PORT || "3000");
 const nextBin = require.resolve("next/dist/bin/next");
 
 const child = spawn(

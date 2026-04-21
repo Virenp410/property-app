@@ -39,7 +39,9 @@ const resolveProductKey = () => {
   return key ;
 };
 const resolveWebAppUrl = () =>
-  String(process.env.NEXT_PUBLIC_WEB_APP_URL || process.env.NEXT_PUBLIC_APP_URL)
+  String(
+    process.env.NEXT_PUBLIC_LISTING_URL ?? ""
+  )
     .replace(/\/$/, "");
  
 const isLoginRoute = (pathname) => pathname.startsWith("/auth/login");

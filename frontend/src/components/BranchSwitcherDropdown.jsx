@@ -17,6 +17,16 @@ function safeText(value) {
   return String(value || "").trim();
 }
 
+function buildGalleryImageUrl(imagePath) {
+  const path = safeText(imagePath);
+  if (!path) return "";
+  if (/^https?:\/\//i.test(path)) return path;
+
+  const baseUrl = String(process.env.NEXT_PUBLIC_S3_BASE_URL || process.env.NEXT_PUBLIC_MS3_S3_BASE_URL || "").trim().replace(/\/$/, "");
+  if (baseUrl) return `${baseUrl}/${path.replace(/^\/+/, "")}`;
+  return path.startsWith("/") ? path : `/${path}`;
+}
+
 export default function BranchSwitcherDropdown({
   value,
   options = [],
@@ -48,7 +58,7 @@ export default function BranchSwitcherDropdown({
   const selectedName = safeText(selected?.name);
   const selectedSub = safeText(selected?.subtitle || selected?.city || selected?.location);
   const initials = getInitials(selectedName || placeholder);
-  const selectedLogo = safeText(selected?.logo);
+  const selectedLogo = buildGalleryImageUrl(selected?.logo);
 
   return (
     <div className={`relative ${className}`.trim()} ref={rootRef}>
@@ -109,7 +119,7 @@ export default function BranchSwitcherDropdown({
                   const isActive = selected?.id != null && item?.id === selected?.id;
                   const name = safeText(item?.name);
                   const sub = safeText(item?.subtitle || item?.city || item?.location);
-                  const logo = safeText(item?.logo);
+                  const logo = buildGalleryImageUrl(item?.logo);
                   return (
                     <button
                       key={String(item?.id ?? name)}

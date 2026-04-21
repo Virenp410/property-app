@@ -91,6 +91,15 @@ const readBusinessesSource = (payload) => payload?.data || payload || {};
 
 const safeString = (value) => String(value || "").trim();
 
+const pickFirstString = (obj, keys) => {
+  if (!obj || !Array.isArray(keys)) return "";
+  for (const key of keys) {
+    const value = safeString(obj[key]);
+    if (value) return value;
+  }
+  return "";
+};
+
 export const getUserBusinessesWithBranches = async () => {
   const productKey = getActiveProductKey();
 
@@ -151,6 +160,22 @@ export const mapBusinessesToBranches = (payload) => {
 
     const displaySub = [city, area].filter(Boolean).join(" \u00B7 ");
 
+    const logo = pickFirstString(branch, [
+      "branch_logo",
+      "logo",
+      "logo_url",
+      "s3_path",
+      "bucket_path",
+      "photo",
+      "photo_url",
+      "picture",
+      "picture_url",
+    ]);
+    
+    if (logo) {
+      console.log("[mapBusinessesToBranches] Branch logo found:", { branchId: branch?.branch_id, logoValue: logo, branchKeys: Object.keys(branch || {}).slice(0, 15) });
+    }
+
     return {
       id: safeString(branch?.branch_id) || safeString(branch?.id),
       name:
@@ -161,7 +186,7 @@ export const mapBusinessesToBranches = (payload) => {
       city,
       subtitle: displaySub,
       pincode,
-      logo: safeString(branch?.branch_logo),
+      logo,
       isDefault: branch?.is_default_branch === true,
       branchStatus: Number(branch?.branch_status || 0),
       onboardingStatus: Number(branch?.onboarding_status || 0),

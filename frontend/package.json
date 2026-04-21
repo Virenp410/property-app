@@ -10,6 +10,7 @@
         "react-devtools": "react-devtools"
     },
     "dependencies": {
+        "@cashfreepayments/cashfree-js": "^1.0.7",
         "axios": "^1.13.5",
         "lottie-react": "^2.4.1",
         "lucide-react": "^0.542.0",

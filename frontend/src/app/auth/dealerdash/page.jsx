@@ -66,19 +66,23 @@ import {
   getUserBusinessesWithBranches,
   mapBusinessesToBranches,
 } from "@/services/user.services";
-import { getBranchGallery } from "@/services/business.services";
+import { getBranchGallery, getPropertyCredits, getPropertyCounts } from "@/services/business.services";
 import { notifyParentAndClose } from "@/lib/auth/popupAuthBridge";
 import { resolveWebSsoRedirectUrl } from "@/services/sso.services";
 import { logout } from "@/lib/auth/authService";
 import ProfileDropdown from "@/components/ProfileDropdown";
 import AppTopbar from "@/components/AppTopbar";
 import BranchSettingsPanel from "@/components/dealer/BranchSettingsPanel";
+import ImageCarousel from "@/components/ImageCarousel";
+import PostPropertyForm from "@/components/feature/property/PostPropertyForm";
+import ManagePropertiesView from "@/components/dealer/ManagePropertiesView";
+import PlansPage from "./plans/page";
 
 export default function DealerDashboardPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const webAppUrl = String(
-    process.env.NEXT_PUBLIC_WEB_APP_URL || process.env.NEXT_PUBLIC_APP_URL || ""
+    process.env.NEXT_PUBLIC_APP_URL ?? ""
   ).replace(/\/$/, "");
   const [profileResolved, setProfileResolved] = useState(false);
   const [dealerAllowed, setDealerAllowed] = useState(false);
@@ -89,6 +93,11 @@ export default function DealerDashboardPage() {
   const [activeBranchId, setActiveBranchId] = useState("");
   const [galleryImages, setGalleryImages] = useState([]);
   const [galleryRefreshKey, setGalleryRefreshKey] = useState(0);
+  const [creditsData, setCreditsData] = useState(null);
+  const [creditsLoading, setCreditsLoading] = useState(false);
+  const [creditsError, setCreditsError] = useState("");
+  const [propertyCounts, setPropertyCounts] = useState(null);
+  const [propertyCountsLoading, setPropertyCountsLoading] = useState(false);
 
   const handleGoHome = async () => {
     const homeTarget = await resolveWebSsoRedirectUrl({ webAppUrl });
@@ -169,8 +178,18 @@ export default function DealerDashboardPage() {
 
   useEffect(() => {
     const tab = String(searchParams?.get("tab") || "").trim().toLowerCase();
-    if (tab === "settings") {
-      setActiveTab("settings");
+    const allowedTabs = new Set([
+      "dashboard",
+      "manage_properties",
+      "post_property",
+      "plans",
+      "credits",
+      "leads",
+      "settings",
+    ]);
+
+    if (allowedTabs.has(tab)) {
+      setActiveTab(tab);
     }
   }, [searchParams]);
 
@@ -252,12 +271,44 @@ export default function DealerDashboardPage() {
 	    (activeBranch?.id && activeBranch?.id !== "primary" ? activeBranch?.id : "") ||
 	    "";
 
+  // Fetch credits whenever the credits tab is active and we have a branchId
+  useEffect(() => {
+    if (activeTab !== "credits") return;
+    if (!galleryBranchId) return;
+    if (creditsData || creditsLoading) return;
+
+    let cancelled = false;
+    setCreditsLoading(true);
+    setCreditsError("");
+    getPropertyCredits(galleryBranchId)
+      .then((data) => { if (!cancelled) setCreditsData(data); })
+      .catch((err) => { if (!cancelled) setCreditsError(err?.response?.data?.error?.message || err?.message || "Failed to load credits."); })
+      .finally(() => { if (!cancelled) setCreditsLoading(false); });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, galleryBranchId]);
+
+  // Fetch property counts whenever the dashboard tab is active
+  useEffect(() => {
+    if (activeTab !== "dashboard") return;
+    if (propertyCounts || propertyCountsLoading) return;
+
+    let cancelled = false;
+    setPropertyCountsLoading(true);
+    getPropertyCounts()
+      .then((data) => { if (!cancelled) setPropertyCounts(data); })
+      .catch((err) => { if (!cancelled) console.error("Failed to load property counts:", err); })
+      .finally(() => { if (!cancelled) setPropertyCountsLoading(false); });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
   const buildGalleryImageUrl = (imagePath) => {
     const path = String(imagePath || "").trim();
     if (!path) return "";
     if (/^https?:\/\//i.test(path)) return path;
 
-    const baseUrl = String(process.env.NEXT_PUBLIC_S3_BASE_URL || "").trim().replace(/\/$/, "");
+    const baseUrl = String(process.env.NEXT_PUBLIC_S3_BASE_URL || process.env.NEXT_PUBLIC_MS3_S3_BASE_URL || "").trim().replace(/\/$/, "");
     if (baseUrl) return `${baseUrl}/${path.replace(/^\/+/, "")}`;
     return path.startsWith("/") ? path : `/${path}`;
   };
@@ -384,60 +435,57 @@ export default function DealerDashboardPage() {
 	    <div className="min-h-screen bg-[#f6f7fb]">
 	      <div className="flex min-h-screen">
         <aside className="hidden w-[270px] flex-col gap-4 border-r border-[#eef0f4] bg-white px-4 py-6 shadow-[0_12px_40px_rgba(15,23,42,0.06)] lg:flex">
-          <div className="rounded-[18px] border border-[#eef0f4] bg-[#f9fafc] p-4 shadow-[0_14px_30px_rgba(15,23,42,0.06)]">
-            <div className="relative h-24 overflow-hidden rounded-2xl border border-dashed border-[#e3e7ee] bg-white/70">
+          {/* ── Branch Hero Card ── */}
+          <div className="relative overflow-hidden rounded-[22px] border border-[#eef0f4] shadow-[0_16px_40px_rgba(15,23,42,0.10)]">
+            {/* Tall Carousel */}
+            <div className="relative h-48 w-full bg-gradient-to-br from-[#e8dfc8] to-[#d5c9a8]">
               {galleryImages.length > 0 ? (
-                <div className="absolute inset-0 flex items-center overflow-hidden p-1">
-                  <style>
-                    {`
-                      @keyframes auto-scroll-left {
-                        0% { transform: translateX(0); }
-                        100% { transform: translateX(calc(-50% - 0.25rem)); }
-                      }
-                      .animate-scroll-left {
-                        animation: auto-scroll-left 20s linear infinite;
-                      }
-                      .animate-scroll-left:hover {
-                        animation-play-state: paused;
-                      }
-                    `}
-                  </style>
-                  <div className="flex h-full w-max animate-scroll-left gap-1">
-                    {[...galleryImages, ...galleryImages, ...galleryImages].map((imagePath, idx) => {
-                      const imageUrl = buildGalleryImageUrl(imagePath);
-                      return (
-                        <div key={idx} className="h-full w-[88px] shrink-0 overflow-hidden rounded-xl bg-slate-100">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={imageUrl}
-                            alt={`Branch gallery ${idx + 1}`}
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+                <ImageCarousel
+                  images={galleryImages.map(img => buildGalleryImageUrl(img))}
+                  className="h-full w-full"
+                  autoPlay={true}
+                  autoPlayInterval={3500}
+                />
               ) : (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 px-3 text-center text-[11px] font-semibold uppercase tracking-[0.16em] text-[#94a3b8]">
-                  <div>No branch gallery images</div>
-                  {galleryBranchId ? <div className="mt-1 text-[10px] normal-case text-[#64748b]">Branch ID: {galleryBranchId}</div> : null}
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+                  <div className="grid h-14 w-14 place-items-center rounded-2xl bg-white/30 backdrop-blur-sm">
+                    <svg className="h-7 w-7 text-white/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                    </svg>
+                  </div>
+                  <p className="text-xs font-semibold text-white/70">Add gallery images</p>
                 </div>
               )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
-            </div>
-            <div className="mt-4 flex items-center gap-3">
-              <div className="grid h-12 w-12 place-items-center overflow-hidden rounded-2xl bg-[#C9A24D] text-sm font-semibold text-white shadow-[0_10px_20px_rgba(201,162,77,0.35)]">
-                {activeBranch?.logo ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={activeBranch.logo} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  (activeBranch?.name || "SB").split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase() || "SB"
-                )}
+              {/* Gradient overlay for text legibility */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent pointer-events-none" />
+
+              {/* Branch info overlaid at bottom */}
+              <div className="absolute bottom-0 left-0 right-0 flex items-end gap-3 px-4 pb-4 pt-10">
+                <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-[#C9A24D] text-sm font-bold text-white shadow-[0_6px_16px_rgba(0,0,0,0.3)] ring-2 ring-white/30">
+                  {activeBranch?.logo ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={buildGalleryImageUrl(activeBranch.logo)} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    (activeBranch?.name || "SB").split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase() || "SB"
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-white drop-shadow-md">{activeBranch?.name || activeBranch?.businessName || "Your Business"}</p>
+                  <p className="text-[11px] text-white/70">{activeBranch?.subtitle || activeBranch?.city || "Add your city"}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-semibold text-[#1f2937]">{activeBranch?.name || activeBranch?.businessName || "Your Business"}</p>
-                <p className="text-xs text-[#98a2b3]">{activeBranch?.subtitle || activeBranch?.city || ""}</p>
+            </div>
+
+            {/* Verified / quick stats strip */}
+            <div className="flex items-center justify-between bg-white px-4 py-3">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-[#22c55e]" />
+                <span className="text-[11px] font-semibold text-[#15803d]">Branch Active</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-[#FBF6EA] px-2.5 py-0.5 text-[11px] font-bold text-[#C9A24D]">
+                  {galleryImages.length} photos
+                </span>
               </div>
             </div>
           </div>
@@ -448,7 +496,7 @@ export default function DealerDashboardPage() {
               onClick={() => setActiveTab("dashboard")}
               className={`flex items-center gap-3 rounded-2xl px-4 py-2.5 transition ${
                 activeTab === "dashboard"
-                  ? "bg-[#0f172a] text-white shadow-[0_14px_24px_rgba(15,23,42,0.22)]"
+                  ? "bg-[#C9A24D] text-white shadow-[0_14px_24px_rgba(201,162,77,0.25)]"
                   : "hover:bg-[#f7f8fc]"
               }`}
             >
@@ -468,7 +516,7 @@ export default function DealerDashboardPage() {
               onClick={() => setActiveTab("manage_properties")}
               className={`flex items-center gap-3 rounded-2xl px-4 py-2.5 transition ${
                 activeTab === "manage_properties"
-                  ? "bg-[#0f172a] text-white shadow-[0_14px_24px_rgba(15,23,42,0.22)]"
+                  ? "bg-[#C9A24D] text-white shadow-[0_14px_24px_rgba(201,162,77,0.25)]"
                   : "hover:bg-[#f7f8fc]"
               }`}
             >
@@ -483,12 +531,44 @@ export default function DealerDashboardPage() {
               </span>
               Manage Properties
             </button>
-            <button type="button" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 hover:bg-[#f7f8fc]">
-              <span className="grid h-8 w-8 place-items-center rounded-xl border border-[#e6e8ee] text-xs text-[#98a2b3]">PL</span>
+            <button
+              type="button"
+              onClick={() => setActiveTab("post_property")}
+              className={`flex items-center gap-3 rounded-2xl px-4 py-2.5 transition ${
+                activeTab === "post_property"
+                  ? "bg-[#C9A24D] text-white shadow-[0_14px_24px_rgba(201,162,77,0.25)]"
+                  : "hover:bg-[#f7f8fc]"
+              }`}
+            >
+              <span
+                className={`grid h-8 w-8 place-items-center rounded-xl text-xs ${
+                  activeTab === "post_property"
+                    ? "bg-white/10"
+                    : "border border-[#e6e8ee] text-[#98a2b3]"
+                }`}
+              >
+                PL
+              </span>
               Post Property
             </button>
-            <button type="button" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 hover:bg-[#f7f8fc]">
-              <span className="grid h-8 w-8 place-items-center rounded-xl border border-[#e6e8ee] text-xs text-[#98a2b3]">PN</span>
+            <button
+              type="button"
+              onClick={() => setActiveTab("plans")}
+              className={`flex items-center gap-3 rounded-2xl px-4 py-2.5 transition ${
+                activeTab === "plans"
+                  ? "bg-[#C9A24D] text-white shadow-[0_14px_24px_rgba(201,162,77,0.25)]"
+                  : "hover:bg-[#f7f8fc]"
+              }`}
+            >
+              <span
+                className={`grid h-8 w-8 place-items-center rounded-xl text-xs ${
+                  activeTab === "plans"
+                    ? "bg-white/10"
+                    : "border border-[#e6e8ee] text-[#98a2b3]"
+                }`}
+              >
+                PN
+              </span>
               Plans
             </button>
             <button
@@ -496,7 +576,7 @@ export default function DealerDashboardPage() {
               onClick={() => setActiveTab("credits")}
               className={`flex items-center gap-3 rounded-2xl px-4 py-2.5 transition ${
                 activeTab === "credits"
-                  ? "bg-[#0f172a] text-white shadow-[0_14px_24px_rgba(15,23,42,0.22)]"
+                  ? "bg-[#C9A24D] text-white shadow-[0_14px_24px_rgba(201,162,77,0.25)]"
                   : "hover:bg-[#f7f8fc]"
               }`}
             >
@@ -511,30 +591,50 @@ export default function DealerDashboardPage() {
               </span>
               Credits
             </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("leads")}
+              className={`flex items-center gap-3 rounded-2xl px-4 py-2.5 transition ${
+                activeTab === "leads"
+                  ? "bg-[#C9A24D] text-white shadow-[0_14px_24px_rgba(201,162,77,0.25)]"
+                  : "hover:bg-[#f7f8fc]"
+              }`}
+            >
+              <span
+                className={`grid h-8 w-8 place-items-center rounded-xl text-xs ${
+                  activeTab === "leads"
+                    ? "bg-white/10"
+                    : "border border-[#e6e8ee] text-[#98a2b3]"
+                }`}
+              >
+                LD
+              </span>
+              Leads
+            </button>
             <button type="button" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 hover:bg-[#f7f8fc]">
               <span className="grid h-8 w-8 place-items-center rounded-xl border border-[#e6e8ee] text-xs text-[#98a2b3]">CL</span>
               Clients
             </button>
-		            <button
-		              type="button"
-		              onClick={handleGoSettings}
-		              className={`flex items-center gap-3 rounded-2xl px-4 py-2.5 transition ${
-		                activeTab === "settings"
-		                  ? "bg-[#0f172a] text-white shadow-[0_14px_24px_rgba(15,23,42,0.22)]"
-		                  : "hover:bg-[#f7f8fc]"
-		              }`}
-		            >
-		              <span
-		                className={`grid h-8 w-8 place-items-center rounded-xl text-xs ${
-		                  activeTab === "settings"
-		                    ? "bg-white/10"
-		                    : "border border-[#e6e8ee] text-[#98a2b3]"
-		                }`}
-		              >
-		                ST
-		              </span>
-		              Settings
-		            </button>
+            <button
+              type="button"
+              onClick={handleGoSettings}
+              className={`flex items-center gap-3 rounded-2xl px-4 py-2.5 transition ${
+                activeTab === "settings"
+                  ? "bg-[#C9A24D] text-white shadow-[0_14px_24px_rgba(201,162,77,0.25)]"
+                  : "hover:bg-[#f7f8fc]"
+              }`}
+            >
+              <span
+                className={`grid h-8 w-8 place-items-center rounded-xl text-xs ${
+                  activeTab === "settings"
+                    ? "bg-white/10"
+                    : "border border-[#e6e8ee] text-[#98a2b3]"
+                }`}
+              >
+                ST
+              </span>
+              Settings
+            </button>
             <button type="button" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 hover:bg-[#f7f8fc]">
               <span className="grid h-8 w-8 place-items-center rounded-xl border border-[#e6e8ee] text-xs text-[#98a2b3]">SV</span>
               Saved Clients
@@ -606,22 +706,25 @@ export default function DealerDashboardPage() {
 
           <section className="mt-6 grid gap-4 lg:grid-cols-4">
             {[
-              { title: "Total Properties Posted", tone: "#C9A24D" },
-              { title: "Active Listings", tone: "#4ade80" },
-              { title: "Total Enquiries", tone: "#8b5cf6" },
-              { title: "Shortlisted Clients", tone: "#f59e0b" },
-            ].map((item) => (
-              <div
-                key={item.title}
-                className="rounded-[18px] border border-[#eef0f4] bg-white px-4 py-5 shadow-[0_12px_30px_rgba(15,23,42,0.08)]"
-              >
-                <p className="text-xl font-semibold text-[#1f2937]">0</p>
-                <p className="mt-1 text-sm text-[#98a2b3]">{item.title}</p>
-                <div className="mt-6 h-[2px] w-full rounded-full bg-[#f1f3f8]">
-                  <div className="h-full w-2/3 rounded-full" style={{ backgroundColor: item.tone }} />
+              { title: "Total Properties Posted", key: "total" },
+              { title: "Active Listings", key: "active" },
+              { title: "Total Enquiries", tone: "#C9A24D" },
+              { title: "Shortlisted Clients", tone: "#C9A24D" },
+            ].map((item) => {
+              const countValue = item.key ? (propertyCounts?.[item.key] ?? 0) : 0;
+              return (
+                <div
+                  key={item.title}
+                  className="rounded-[18px] border border-[#eef0f4] bg-white px-4 py-5 shadow-[0_12px_30px_rgba(15,23,42,0.08)]"
+                >
+                  <p className="text-xl font-semibold text-[#1f2937]">{countValue}</p>
+                  <p className="mt-1 text-sm text-[#98a2b3]">{item.title}</p>
+                  <div className="mt-6 h-[2px] w-full rounded-full bg-[#f1f3f8]">
+                    <div className="h-full w-2/3 rounded-full" style={{ backgroundColor: item.tone || "#C9A24D" }} />
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </section>
 
           <section className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
@@ -693,104 +796,122 @@ export default function DealerDashboardPage() {
                   <h1 className="text-2xl font-semibold text-[#1f2937]">Properties</h1>
                   <p className="mt-1 text-sm text-[#98a2b3]">Manage Your Properties</p>
                 </div>
-                <button type="button" className="flex items-center justify-center gap-2 rounded-full bg-[#0f62fe] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_6px_16px_rgba(15,98,254,0.2)] transition hover:-translate-y-0.5 hover:bg-[#0353e9]">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"></path></svg>
-                  Post a Property
+	                <button
+                    type="button"
+                    onClick={() => setActiveTab("post_property")}
+                    className="flex items-center justify-center gap-2 rounded-full bg-[#0f62fe] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_6px_16px_rgba(15,98,254,0.2)] transition hover:-translate-y-0.5 hover:bg-[#0353e9]"
+                  >
+	                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"></path></svg>
+	                  Post a Property
+	                </button>
+	              </section>
+
+
+                <ManagePropertiesView
+                  onPostProperty={() => setActiveTab("post_property")}
+                />
+	            </div>
+	          )}
+
+          {activeTab === "leads" && (
+            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <section className="mt-6 flex items-center justify-between">
+                <div>
+                  <h1 className="text-2xl font-semibold text-[#1f2937]">Leads</h1>
+                  <p className="mt-1 text-sm text-[#98a2b3]">Track and manage incoming seller and buyer leads.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("dashboard")}
+                  className="rounded-full border border-[#eef0f4] bg-white px-4 py-2 text-sm font-medium text-[#475569] shadow-sm transition hover:bg-[#f8fafc]"
+                >
+                  Back to Dashboard
                 </button>
               </section>
 
               <section className="mt-6 rounded-[20px] border border-[#eef0f4] bg-white p-8 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
-                <h2 className="text-base font-semibold text-[#1f2937]">Recently Posted Properties</h2>
-                <div className="flex h-[320px] flex-col items-center justify-center text-center">
-                  <div className="mb-4 grid h-16 w-16 place-items-center rounded-full bg-[#f4f7f9] text-[#a1abbd]">
-                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 00.75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 00-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0112 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 01-.673-.38m0 0A2.18 2.18 0 013 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 013.413-.387m7.5 0V5.25A2.25 2.25 0 0013.5 3h-3a2.25 2.25 0 00-2.25 2.25v.894m7.5 0a48.667 48.667 0 00-7.5 0M12 12.75h.008v.008H12v-.008z" />
+                <div className="flex flex-col items-center justify-center gap-4 text-center text-[#475467]">
+                  <div className="grid h-16 w-16 place-items-center rounded-full bg-[#eff6ff] text-[#0f62fe]">
+                    <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10m-9 4h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-bold tracking-tight text-[#111827]">No properties posted yet</h3>
-                  <p className="mt-2 max-w-md text-sm text-[#6b7280]">
-                    Start posting by creating your first property listing. It only takes a few minutes.
+                  <h2 className="text-xl font-semibold text-[#111827]">Lead flow is empty</h2>
+                  <p className="max-w-xl text-sm text-[#6b7280]">
+                    Leads will appear here once buyers or sellers start contacting your listings. Use this view to quickly check status and follow up.
                   </p>
-                  <button type="button" className="mt-6 rounded-xl bg-[#0f172a] px-6 py-2.5 text-sm font-semibold text-white shadow-[0_6px_16px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-[#1e293b]">
-                    Post Your First Property
-                  </button>
-                </div>
-              </section>
-
-              <section className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="flex items-center gap-4 rounded-[16px] border border-[#eef0f4] bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
-                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#f0f5ff] text-[#0f62fe]">
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3.75h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008z" /></svg>
-                  </div>
-                  <div>
-                    <p className="text-xl font-bold text-[#1f2937]">0</p>
-                    <p className="text-xs font-semibold text-[#98a2b3]">Total Properties</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4 rounded-[16px] border border-[#eef0f4] bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
-                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#edfcf2] text-[#12b76a]">
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
-                  </div>
-                  <div>
-                    <p className="text-xl font-bold text-[#1f2937]">0</p>
-                    <p className="text-xs font-semibold text-[#98a2b3]">Active</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4 rounded-[16px] border border-[#eef0f4] bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
-                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#fef3f2] text-[#f04438]">
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                  </div>
-                  <div>
-                    <p className="text-xl font-bold text-[#1f2937]">0</p>
-                    <p className="text-xs font-semibold text-[#98a2b3]">Expired</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4 rounded-[16px] border border-[#eef0f4] bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
-                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#f4f3ff] text-[#7a5af8]">
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>
-                  </div>
-                  <div>
-                    <p className="text-xl font-bold text-[#1f2937]">0</p>
-                    <p className="text-xs font-semibold text-[#98a2b3]">Total Applications</p>
-                  </div>
                 </div>
               </section>
             </div>
           )}
 
-          {activeTab === "credits" && (
+
+
+          {activeTab === "post_property" && (
+            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <section className="mt-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h1 className="text-2xl font-semibold text-[#1f2937]">Post a Property</h1>
+                    <p className="mt-1 text-sm text-[#98a2b3]">Fill in the details to list your property on SeaNeb Realty.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("manage_properties")}
+                    className="flex items-center gap-2 rounded-xl border border-[#eef0f4] bg-white px-4 py-2 text-sm font-medium text-[#475569] shadow-sm transition hover:bg-[#f8fafc]"
+                  >
+                    ← Back to Properties
+                  </button>
+                </div>
+                <PostPropertyForm />
+              </section>
+            </div>
+          )}
+
+          {activeTab === "plans" && (
+            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <PlansPage />
+            </div>
+          )}
+
+          {activeTab === "credits" && (() => {
+            const cd = creditsData || { available: 0, purchased: 0, used: 0, transactions: [] };
+            return (
 	            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-6">
               {/* Top Metrics Row */}
               <section className="grid gap-4 sm:grid-cols-3">
-                <div className="rounded-[16px] border border-[#eef0f4] bg-white p-6 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
-                  <div className="mb-4 grid h-12 w-12 place-items-center rounded-xl bg-[#f0f9ff] text-[#0ea5e9]">
-                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" /></svg>
+                {[
+                  { label: "Available", sub: "Credits ready to use", value: cd.available, color: "text-emerald-600", bg: "bg-emerald-50" },
+                  { label: "Purchased", sub: "Total credits bought", value: cd.purchased, color: "text-blue-600", bg: "bg-blue-50" },
+                  { label: "Used", sub: "Credits spent on posts", value: cd.used, color: "text-amber-600", bg: "bg-[#FBF6EA]" },
+                ].map(({ label, sub, value, color, bg }) => (
+                  <div key={label} className="rounded-[16px] border border-[#eef0f4] bg-white p-6 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
+                    <div className={`mb-4 grid h-12 w-12 place-items-center rounded-xl ${bg} ${color}`}>
+                      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25 4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375" /></svg>
+                    </div>
+                    {creditsLoading ? (
+                      <div className="h-8 w-16 animate-pulse rounded-lg bg-[#f1f5f9]" />
+                    ) : (
+                      <p className={`text-2xl font-bold ${color}`}>{value ?? 0}</p>
+                    )}
+                    <p className="mt-1 text-xs font-bold uppercase tracking-wider text-[#98a2b3]">{label}</p>
+                    <p className="mt-1 text-xs text-[#98a2b3]">{sub}</p>
                   </div>
-                  <p className="text-2xl font-bold text-[#1f2937]">0</p>
-                  <p className="mt-1 text-xs font-bold uppercase tracking-wider text-[#98a2b3]">Available</p>
-                  <p className="mt-1 text-xs text-[#98a2b3]">Credits ready to use</p>
-                </div>
-                <div className="rounded-[16px] border border-[#eef0f4] bg-white p-6 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
-                  <div className="mb-4 grid h-12 w-12 place-items-center rounded-xl bg-[#ecfdf5] text-[#10b981]">
-                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V5.942c0-.754-.726-1.294-1.453-1.096V5.942a60.114 60.114 0 00-15.797 2.101c-.503.136-.837.59-.837 1.107v9.711c0 .517.334.97.837 1.107v9.711zM11.25 17.25h1.5A1.5 1.5 0 0014.25 15.75v-1.5A1.5 1.5 0 0012.75 12.75h-1.5a1.5 1.5 0 01-1.5-1.5h1.5zm-1.5-1.5a3 3 0 016 0" /></svg>
-                  </div>
-                  <p className="text-2xl font-bold text-[#1f2937]">0</p>
-                  <p className="mt-1 text-xs font-bold uppercase tracking-wider text-[#98a2b3]">Purchased</p>
-                  <p className="mt-1 text-xs text-[#98a2b3]">Total credits bought</p>
-                </div>
-                <div className="rounded-[16px] border border-[#eef0f4] bg-white p-6 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
-                  <div className="mb-4 grid h-12 w-12 place-items-center rounded-xl bg-[#fff7ed] text-[#f97316]">
-                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 00.75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 00-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0112 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 01-.673-.38m0 0A2.18 2.18 0 013 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 013.413-.387m7.5 0V5.25A2.25 2.25 0 0013.5 3h-3a2.25 2.25 0 00-2.25 2.25v.894m7.5 0a48.667 48.667 0 00-7.5 0M12 12.75h.008v.008H12v-.008z" /></svg>
-                  </div>
-                  <p className="text-2xl font-bold text-[#1f2937]">0</p>
-                  <p className="mt-1 text-xs font-bold uppercase tracking-wider text-[#98a2b3]">Used</p>
-                  <p className="mt-1 text-xs text-[#98a2b3]">Credits spent on property posts</p>
-                </div>
+                ))}
               </section>
+
+              {/* Error banner */}
+              {creditsError && (
+                <div className="flex items-center gap-3 rounded-xl border border-red-100 bg-red-50 px-5 py-4 text-sm text-red-600">
+                  <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+                  {creditsError}
+                  <button onClick={() => { setCreditsError(""); setCreditsData(null); }} className="ml-auto underline">Retry</button>
+                </div>
+              )}
 
               {/* Transaction History Card */}
               <section className="rounded-[20px] border border-[#eef0f4] bg-white p-8 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
-                <div className="flex items-center justify-between">
+                <div className="mb-6 flex items-center justify-between">
                   <div>
                     <h2 className="text-lg font-semibold text-[#1f2937]">Transaction History</h2>
                     <p className="mt-1 text-sm text-[#98a2b3]">All credit activity</p>
@@ -801,19 +922,61 @@ export default function DealerDashboardPage() {
                   </div>
                 </div>
 
-                <div className="flex h-[320px] flex-col items-center justify-center text-center">
-                  <div className="mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-[#f8fafc] text-[#cbd5e1]">
-                    <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25M9 16.5v.75m3-3v3M15 12v5.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>
+                {creditsLoading ? (
+                  <div className="space-y-3">
+                    {[1,2,3].map(i => (
+                      <div key={i} className="h-12 w-full animate-pulse rounded-xl bg-[#f1f5f9]" />
+                    ))}
                   </div>
-                  <h3 className="text-lg font-bold tracking-tight text-[#111827]">No transactions yet</h3>
-                  <p className="mt-1 text-sm text-[#6b7280]">
-                    Purchase credits to see your transaction history here.
-                  </p>
-                  <button type="button" className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#0f172a] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_6px_16px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-[#1e293b]">
-                    Browse Plans
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" /></svg>
-                  </button>
-                </div>
+                ) : cd.transactions.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-[#f1f5f9]">
+                          <th className="pb-3 text-left text-xs font-semibold uppercase tracking-wider text-[#98a2b3]">Type</th>
+                          <th className="pb-3 text-left text-xs font-semibold uppercase tracking-wider text-[#98a2b3]">Credits</th>
+                          <th className="pb-3 text-left text-xs font-semibold uppercase tracking-wider text-[#98a2b3]">Date</th>
+                          <th className="pb-3 text-left text-xs font-semibold uppercase tracking-wider text-[#98a2b3]">Note</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#f8fafc]">
+                        {cd.transactions.map((tx, i) => {
+                          const isTopup = (tx.type || "").toLowerCase().includes("top") || Number(tx.credits ?? tx.amount ?? 0) > 0;
+                          return (
+                            <tr key={tx.id || i} className="transition hover:bg-[#f8fafc]">
+                              <td className="py-3">
+                                <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                  isTopup ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"
+                                }`}>
+                                  {isTopup ? "+ Topup" : "− Used"}
+                                </span>
+                              </td>
+                              <td className={`py-3 font-semibold ${ isTopup ? "text-green-600" : "text-amber-600" }`}>
+                                {isTopup ? "+" : "−"}{Math.abs(tx.credits ?? tx.amount ?? 0)}
+                              </td>
+                              <td className="py-3 text-[#6b7280]">
+                                {tx.created_at ? new Date(tx.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}
+                              </td>
+                              <td className="py-3 text-[#98a2b3]">{tx.note || tx.description || "—"}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="flex h-[280px] flex-col items-center justify-center text-center">
+                    <div className="mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-[#f8fafc] text-[#cbd5e1]">
+                      <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25M9 16.5v.75m3-3v3M15 12v5.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>
+                    </div>
+                    <h3 className="text-lg font-bold tracking-tight text-[#111827]">No transactions yet</h3>
+                    <p className="mt-1 text-sm text-[#6b7280]">Purchase credits to see your transaction history here.</p>
+                    <button type="button" onClick={() => setActiveTab("plans")} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#0f172a] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_6px_16px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-[#1e293b]">
+                      Browse Plans
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" /></svg>
+                    </button>
+                  </div>
+                )}
               </section>
 
               {/* How Credits Work */}
@@ -841,13 +1004,25 @@ export default function DealerDashboardPage() {
                 </div>
               </section>
 	            </div>
-	          )}
+            );
+          })()}
 
 	          {activeTab === "settings" && (
 	            <BranchSettingsPanel
 	              activeBranch={activeBranch}
 	              profile={profile}
 	              branchId={galleryBranchId}
+	              onBranchUpdate={async (data) => {
+	                // Perform a full refresh from server to ensure data integrity
+	                try {
+	                  const payload = await getUserBusinessesWithBranches();
+	                  const mapped = mapBusinessesToBranches(payload);
+	                  console.log("[DealerDash] Branch update refresh complete, mapped branches:", mapped.map(b => ({ id: b.id, name: b.name, logo: b.logo })));
+	                  setBranches(mapped);
+	                } catch (err) {
+	                  console.error("[DealerDash] Refresh after branch update failed:", err);
+	                }
+	              }}
 	            />
 	          )}
 	        </div>

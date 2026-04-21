@@ -103,6 +103,8 @@ export const setAccessToken = (token) => {
   accessToken = nextValue || null;
 };
 
+export const getAccessToken = () => String(accessToken || "").trim();
+
 export const clearAccessToken = () => {
   accessToken = null;
 };

@@ -131,7 +131,7 @@ function RegistrationFormContent() {
   const [lang, setLang] = useAppLang(searchParams);
   const t = useTranslation(lang);
   const webAppUrl = String(
-    process.env.NEXT_PUBLIC_WEB_APP_URL || process.env.NEXT_PUBLIC_APP_URL || ""
+    process.env.NEXT_PUBLIC_APP_URL ?? ""
   ).replace(/\/$/, "");
 
   const [mounted, setMounted] = useState(false);

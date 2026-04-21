@@ -7,7 +7,7 @@ import { resolveWebSsoRedirectUrl } from "@/services/sso.services";
 function PostRegisterRedirectContent() {
   const router = useRouter();
   const webAppUrl = String(
-    process.env.NEXT_PUBLIC_WEB_APP_URL || process.env.NEXT_PUBLIC_APP_URL || ""
+    process.env.NEXT_PUBLIC_APP_URL ?? ""
   ).replace(/\/$/, "");
 
   useEffect(() => {
